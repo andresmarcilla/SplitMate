@@ -1,1041 +1,1245 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
-import { 
-  Receipt, 
-  Users, 
-  Plus, 
-  ChevronLeft, 
-  Trash2, 
-  ArrowRight, 
-  CheckSquare, 
-  Square,
-  Plane,
-  BadgeDollarSign,
-  Pencil,
-  AlertCircle,
-  Calendar,
-  Key,
-  Copy
-} from 'lucide-react';
-
-// --- Firebase Initialization ---
-const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-// --- Debt Simplification Algorithm ---
-function calculateBalances(tripExpenses, participants) {
-  let balances = {};
-  participants.forEach(p => balances[p] = 0);
-
-  tripExpenses.forEach(exp => {
-    // Credit the person who paid
-    if (balances[exp.paidBy] === undefined) balances[exp.paidBy] = 0;
-    balances[exp.paidBy] += Number(exp.amount);
-
-    // Debit the people who were involved
-    const splitCount = exp.splitAmong.length;
-    if (splitCount > 0) {
-      const splitAmount = Number(exp.amount) / splitCount;
-      exp.splitAmong.forEach(p => {
-        if (balances[p] === undefined) balances[p] = 0;
-        balances[p] -= splitAmount;
-      });
-    }
-  });
-
-  // Round to 2 decimals to avoid floating point anomalies
-  for (const p in balances) {
-    balances[p] = Math.round(balances[p] * 100) / 100;
-  }
-  return balances;
-}
-
-function simplifyDebts(balances) {
-  let debtors = [];
-  let creditors = [];
-
-  for (const [person, amount] of Object.entries(balances)) {
-    if (amount < -0.01) debtors.push({ person, amount: -amount });
-    if (amount > 0.01) creditors.push({ person, amount });
-  }
-
-  // Sort by largest amounts first to optimize clearing large debts
-  debtors.sort((a, b) => b.amount - a.amount);
-  creditors.sort((a, b) => b.amount - a.amount);
-
-  let transfers = [];
-  let i = 0; // debtors index
-  let j = 0; // creditors index
-
-  while (i < debtors.length && j < creditors.length) {
-    let debtor = debtors[i];
-    let creditor = creditors[j];
-
-    let minAmount = Math.min(debtor.amount, creditor.amount);
-    minAmount = Math.round(minAmount * 100) / 100;
-
-    if (minAmount > 0) {
-      transfers.push({
-        from: debtor.person,
-        to: creditor.person,
-        amount: minAmount
-      });
-    }
-
-    debtor.amount -= minAmount;
-    creditor.amount -= minAmount;
-
-    if (debtor.amount < 0.01) i++;
-    if (creditor.amount < 0.01) j++;
-  }
-
-  return transfers;
-}
-
-// --- Helpers ---
-function getExpenseIcon(description, isSettlement) {
-  if (isSettlement) return '💸';
-  const lowerDesc = description.toLowerCase();
-  if (/(comida|cena|almuerzo|desayuno|restaurante|bar|cerveza|pizza|sushi|burger|mcdonalds|super|compra)/i.test(lowerDesc)) return '🍔';
-  if (/(taxi|uber|cabify|bus|autobus|tren|vuelo|avion|gasolina|peaje|coche|transporte|metro)/i.test(lowerDesc)) return '🚕';
-  if (/(hotel|airbnb|hostal|alojamiento|casa)/i.test(lowerDesc)) return '🏨';
-  if (/(cine|museo|entrada|ticket|tour|excursion|fiesta|discoteca|copas)/i.test(lowerDesc)) return '🎟️';
-  return '🧾';
-}
-
-function formatDateRange(start, end) {
-  if (!start && !end) return null;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SplitMate - Gastos de Viaje</title>
   
-  const format = (dStr) => {
-    if(!dStr) return '?';
-    const [y, m, d] = dStr.split('-');
-    return `${d}/${m}/${y.slice(2)}`; // Formato DD/MM/YY
-  };
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   
-  if (start && end) return `${format(start)} al ${format(end)}`;
-  if (start) return `Desde ${format(start)}`;
-  if (end) return `Hasta ${format(end)}`;
-  return null;
-}
-
-// --- Main Application ---
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [profileName, setProfileName] = useState(null);
-  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
-  const [trips, setTrips] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [currentTripId, setCurrentTripId] = useState(null);
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  // Modal States
-  const [showNewTripModal, setShowNewTripModal] = useState(false);
-  const [showJoinTripModal, setShowJoinTripModal] = useState(false);
-  const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
-  const [expenseToEdit, setExpenseToEdit] = useState(null);
-  const [tripToDelete, setTripToDelete] = useState(null);
+  <!-- Babel (Para poder escribir React/JSX dentro de un archivo HTML) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-100">
+  <!-- Aquí es donde React renderizará la aplicación -->
+  <div id="root"></div>
 
-  // --- Auth & Data Fetching ---
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Auth error:", error);
-      }
+  <!-- El código principal de la app -->
+  <script type="text/babel" data-type="module">
+    // --- Importaciones de Firebase ---
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    // --- Hooks de React ---
+    const { useState, useEffect, useMemo } = React;
+
+    // ==========================================
+    // ⚠️ TU CONFIGURACIÓN DE FIREBASE AQUÍ ⚠️
+    // Reemplaza los valores dentro de este objeto con los de tu proyecto de Firebase.
+    // ==========================================
+    let userFirebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      projectId: "TU_PROYECTO",
+      storageBucket: "TU_PROYECTO.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
     };
-    initAuth();
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        // Obtenemos el perfil del usuario para saber su nombre
-        const profileRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'data');
-        const profileSnap = await getDoc(profileRef);
-        if (profileSnap.exists()) {
-          setProfileName(profileSnap.data().name);
-        }
-        setIsProfileLoaded(true);
-      } else {
-        setProfileName(null);
-        setIsProfileLoaded(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+    // (Código interno para compatibilidad con el entorno de vista previa)
+    const firebaseConfig = typeof __firebase_config !== 'undefined' && Object.keys(__firebase_config || {}).length > 0 
+      ? JSON.parse(typeof __firebase_config === 'string' ? __firebase_config : JSON.stringify(__firebase_config)) 
+      : userFirebaseConfig;
 
-  useEffect(() => {
-    if (!user || !profileName) return;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'splitmate-prod';
 
-    // Public collections so everyone in the group can access the trips
-    const tripsRef = collection(db, 'artifacts', appId, 'public', 'data', 'trips');
-    const expensesRef = collection(db, 'artifacts', appId, 'public', 'data', 'expenses');
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    const unsubTrips = onSnapshot(tripsRef, (snap) => {
-      const fetchedTrips = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort in memory (newest first)
-      fetchedTrips.sort((a, b) => b.createdAt - a.createdAt);
-      setTrips(fetchedTrips);
-    }, (err) => console.error("Error fetching trips:", err));
-
-    const unsubExpenses = onSnapshot(expensesRef, (snap) => {
-      const fetchedExpenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      fetchedExpenses.sort((a, b) => b.createdAt - a.createdAt);
-      setExpenses(fetchedExpenses);
-    }, (err) => console.error("Error fetching expenses:", err));
-
-    return () => {
-      unsubTrips();
-      unsubExpenses();
+    // --- Sistema de Iconos Integrado ---
+    // En lugar de requerir descargas externas, integramos los íconos (Lucide) directamente en formato SVG
+    const Icon = ({ name, className }) => {
+      const paths = {
+        Plane: <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.2-1.1.6L3 8l5 5-3.2 3.2-2.4-.8L1.6 17l4.1 1.3L7 22.4l1.6-.8-.8-2.4 3.2-3.2 5 5l1.2-.7c.4-.2.7-.6.6-1.1z"/>,
+        Users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+        Plus: <><path d="M5 12h14"/><path d="M12 5v14"/></>,
+        ChevronLeft: <path d="m15 18-6-6 6-6"/>,
+        Trash2: <><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>,
+        ArrowRight: <><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></>,
+        CheckSquare: <><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
+        Square: <rect width="18" height="18" x="3" y="3" rx="2"/>,
+        BadgeDollarSign: <><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></>,
+        Pencil: <><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></>,
+        AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>,
+        Calendar: <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>,
+        Key: <><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></>,
+        Copy: <><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></>,
+        Globe: <><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></>,
+        RefreshCw: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>,
+        Receipt: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></>
+      };
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+          {paths[name]}
+        </svg>
+      );
     };
-  }, [user, profileName]);
 
-  // --- Handlers ---
-  const handleSaveProfile = async (name) => {
-    if (!user) return;
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data'), { name });
-    setProfileName(name);
-  };
+    // --- Constantes de Monedas ---
+    const CURRENCIES = {
+      USD: { symbol: '$', name: 'US Dollar (USD)' },
+      EUR: { symbol: '€', name: 'Euro (EUR)' },
+      MXN: { symbol: '$', name: 'Peso Mexicano (MXN)' },
+      ARS: { symbol: '$', name: 'Peso Argentino (ARS)' },
+      COP: { symbol: '$', name: 'Peso Colombiano (COP)' },
+      CLP: { symbol: '$', name: 'Peso Chileno (CLP)' },
+      PEN: { symbol: 'S/', name: 'Sol Peruano (PEN)' },
+      GBP: { symbol: '£', name: 'British Pound (GBP)' },
+      BRL: { symbol: 'R$', name: 'Real Brasileño (BRL)' },
+      JPY: { symbol: '¥', name: 'Yen Japonés (JPY)' },
+    };
 
-  const handleCreateTrip = async (tripData) => {
-    if (!user || !profileName) return;
-    
-    // Aseguramos que el creador siempre esté en la lista de participantes
-    const finalParticipants = [...new Set([...tripData.participants, profileName])];
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    // --- Algoritmo de Simplificación de Deudas ---
+    function calculateBalances(tripExpenses, participants) {
+      let balances = {};
+      participants.forEach(p => balances[p] = 0);
 
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trips'), {
-      ...tripData,
-      participants: finalParticipants,
-      inviteCode,
-      createdAt: Date.now(),
-      createdBy: user.uid
-    });
-    setShowNewTripModal(false);
-  };
+      tripExpenses.forEach(exp => {
+        const amountToUse = exp.convertedAmount !== undefined ? Number(exp.convertedAmount) : Number(exp.amount);
 
-  const handleJoinTrip = async (code) => {
-    if (!user || !profileName) return;
-    const upperCode = code.toUpperCase();
-    const tripToJoin = trips.find(t => t.inviteCode === upperCode);
-    
-    if (tripToJoin) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
-        participants: arrayUnion(profileName)
+        if (balances[exp.paidBy] === undefined) balances[exp.paidBy] = 0;
+        balances[exp.paidBy] += amountToUse;
+
+        const splitCount = exp.splitAmong.length;
+        if (splitCount > 0) {
+          const splitAmount = amountToUse / splitCount;
+          exp.splitAmong.forEach(p => {
+            if (balances[p] === undefined) balances[p] = 0;
+            balances[p] -= splitAmount;
+          });
+        }
       });
-      setShowJoinTripModal(false);
-      setCurrentTripId(tripToJoin.id); // Llevamos al usuario directo al viaje
-    } else {
-      alert("Código inválido o viaje no encontrado.");
+
+      for (const p in balances) {
+        balances[p] = Math.round(balances[p] * 100) / 100;
+      }
+      return balances;
     }
-  };
 
-  const handleSaveExpense = async (expenseData) => {
-    if (!user || !currentTripId) return;
-    
-    if (expenseToEdit) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseToEdit.id), {
-        ...expenseData
-      });
-    } else {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
-        ...expenseData,
-        tripId: currentTripId,
-        createdAt: Date.now(),
-        addedBy: user.uid
-      });
+    function simplifyDebts(balances) {
+      let debtors = [];
+      let creditors = [];
+
+      for (const [person, amount] of Object.entries(balances)) {
+        if (amount < -0.01) debtors.push({ person, amount: -amount });
+        if (amount > 0.01) creditors.push({ person, amount });
+      }
+
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      let transfers = [];
+      let i = 0; 
+      let j = 0; 
+
+      while (i < debtors.length && j < creditors.length) {
+        let debtor = debtors[i];
+        let creditor = creditors[j];
+
+        let minAmount = Math.min(debtor.amount, creditor.amount);
+        minAmount = Math.round(minAmount * 100) / 100;
+
+        if (minAmount > 0) {
+          transfers.push({
+            from: debtor.person,
+            to: creditor.person,
+            amount: minAmount
+          });
+        }
+
+        debtor.amount -= minAmount;
+        creditor.amount -= minAmount;
+
+        if (debtor.amount < 0.01) i++;
+        if (creditor.amount < 0.01) j++;
+      }
+
+      return transfers;
     }
-    setShowNewExpenseModal(false);
-    setExpenseToEdit(null);
-  };
 
-  const handleSettleDebt = async (transfer) => {
-    if (!user || !currentTripId) return;
-    
-    // Create a special expense representing the settlement
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
-      description: `Pago de ${transfer.from} a ${transfer.to}`,
-      amount: transfer.amount,
-      paidBy: transfer.from,
-      splitAmong: [transfer.to],
-      isSettlement: true,
-      tripId: currentTripId,
-      createdAt: Date.now(),
-      addedBy: user.uid
-    });
-  };
-
-  const openEditExpense = (expense) => {
-    setExpenseToEdit(expense);
-    setShowNewExpenseModal(true);
-  };
-
-  const handleDeleteExpense = async (expenseId) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseId));
-  };
-
-  const handleDeleteTrip = async () => {
-    if (!user || !tripToDelete) return;
-    
-    // Delete all expenses associated with this trip
-    const relatedExpenses = expenses.filter(e => e.tripId === tripToDelete.id);
-    for (const exp of relatedExpenses) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
+    // --- Funciones Auxiliares ---
+    function getExpenseIcon(description, isSettlement) {
+      if (isSettlement) return '💸';
+      const lowerDesc = description.toLowerCase();
+      if (/(comida|cena|almuerzo|desayuno|restaurante|bar|cerveza|pizza|sushi|burger|mcdonalds|super|compra)/i.test(lowerDesc)) return '🍔';
+      if (/(taxi|uber|cabify|bus|autobus|tren|vuelo|avion|gasolina|peaje|coche|transporte|metro)/i.test(lowerDesc)) return '🚕';
+      if (/(hotel|airbnb|hostal|alojamiento|casa)/i.test(lowerDesc)) return '🏨';
+      if (/(cine|museo|entrada|ticket|tour|excursion|fiesta|discoteca|copas)/i.test(lowerDesc)) return '🎟️';
+      return '🧾';
     }
-    // Delete the trip itself
-    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToDelete.id));
-    
-    setTripToDelete(null);
-    setCurrentTripId(null);
-  };
 
-  // --- Render ---
-  if (!user || !isProfileLoaded) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center">
-          <Plane className="w-12 h-12 text-emerald-500 mb-4" />
-          <p className="text-slate-500 font-medium">Cargando SplitMate...</p>
-        </div>
-      </div>
-    );
-  }
+    function formatDateRange(start, end) {
+      if (!start && !end) return null;
+      
+      const format = (dStr) => {
+        if(!dStr) return '?';
+        const [y, m, d] = dStr.split('-');
+        return `${d}/${m}/${y.slice(2)}`; 
+      };
+      
+      if (start && end) return `${format(start)} al ${format(end)}`;
+      if (start) return `Desde ${format(start)}`;
+      if (end) return `Hasta ${format(end)}`;
+      return null;
+    }
 
-  // Pantalla de Bienvenida si el usuario es nuevo
-  if (!profileName) {
-    return <WelcomeScreen onSave={handleSaveProfile} />;
-  }
+    function formatDate(dStr) {
+      if (!dStr) return '';
+      const [y, m, d] = dStr.split('-');
+      return `${d}/${m}/${y.slice(2)}`;
+    }
 
-  // Filtramos para mostrar SOLO los viajes donde el usuario participa
-  const myTrips = trips.filter(t => t.participants.includes(profileName));
-  const currentTrip = trips.find(t => t.id === currentTripId);
-  const tripExpenses = expenses.filter(e => e.tripId === currentTripId);
+    // --- Componente Principal ---
+    function App() {
+      const [user, setUser] = useState(null);
+      const [profileName, setProfileName] = useState(null);
+      const [isProfileLoaded, setIsProfileLoaded] = useState(false);
+      const [trips, setTrips] = useState([]);
+      const [expenses, setExpenses] = useState([]);
+      const [currentTripId, setCurrentTripId] = useState(null);
+      
+      const [showNewTripModal, setShowNewTripModal] = useState(false);
+      const [showJoinTripModal, setShowJoinTripModal] = useState(false);
+      const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
+      const [expenseToEdit, setExpenseToEdit] = useState(null);
+      const [tripToDelete, setTripToDelete] = useState(null);
 
-  return (
-    <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-20">
-      <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl relative overflow-hidden">
+      // --- Autenticación y Obtención de Datos ---
+      useEffect(() => {
+        const initAuth = async () => {
+          try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await signInAnonymously(auth);
+            }
+          } catch (error) {
+            console.error("Auth error:", error);
+          }
+        };
+        initAuth();
+
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+          setUser(currentUser);
+          if (currentUser) {
+            const profileRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'data');
+            const profileSnap = await getDoc(profileRef);
+            if (profileSnap.exists()) {
+              setProfileName(profileSnap.data().name);
+            }
+            setIsProfileLoaded(true);
+          } else {
+            setProfileName(null);
+            setIsProfileLoaded(false);
+          }
+        });
+        return () => unsubscribe();
+      }, []);
+
+      useEffect(() => {
+        if (!user || !profileName) return;
+
+        const tripsRef = collection(db, 'artifacts', appId, 'public', 'data', 'trips');
+        const expensesRef = collection(db, 'artifacts', appId, 'public', 'data', 'expenses');
+
+        const unsubTrips = onSnapshot(tripsRef, (snap) => {
+          const fetchedTrips = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          fetchedTrips.sort((a, b) => {
+            const dateA = a.startDate || a.date || new Date(a.createdAt).toISOString().split('T')[0];
+            const dateB = b.startDate || b.date || new Date(b.createdAt).toISOString().split('T')[0];
+            if (dateA !== dateB) return dateB.localeCompare(dateA);
+            return b.createdAt - a.createdAt;
+          });
+          setTrips(fetchedTrips);
+        }, (err) => console.error("Error fetching trips:", err));
+
+        const unsubExpenses = onSnapshot(expensesRef, (snap) => {
+          const fetchedExpenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          fetchedExpenses.sort((a, b) => {
+            const dateA = a.date || new Date(a.createdAt).toISOString().split('T')[0];
+            const dateB = b.date || new Date(b.createdAt).toISOString().split('T')[0];
+            if (dateA !== dateB) return dateB.localeCompare(dateA);
+            return b.createdAt - a.createdAt;
+          });
+          setExpenses(fetchedExpenses);
+        }, (err) => console.error("Error fetching expenses:", err));
+
+        return () => {
+          unsubTrips();
+          unsubExpenses();
+        };
+      }, [user, profileName]);
+
+      // --- Funciones de Gestión ---
+      const handleSaveProfile = async (name) => {
+        if (!user) return;
+        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data'), { name });
+        setProfileName(name);
+      };
+
+      const handleCreateTrip = async (tripData) => {
+        if (!user || !profileName) return;
         
-        {/* Header */}
-        <header className="bg-emerald-600 text-white p-4 sticky top-0 z-10 shadow-md">
-          <div className="flex items-center justify-between">
-            {currentTripId ? (
-              <button onClick={() => setCurrentTripId(null)} className="flex items-center text-emerald-50 hover:text-white transition-colors">
-                <ChevronLeft className="w-6 h-6 mr-1" />
-                <span className="font-medium">Volver</span>
+        const finalParticipants = [...new Set([...tripData.participants, profileName])];
+        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trips'), {
+          ...tripData,
+          participants: finalParticipants,
+          inviteCode,
+          createdAt: Date.now(),
+          createdBy: user.uid
+        });
+        setShowNewTripModal(false);
+      };
+
+      const handleJoinTrip = async (code) => {
+        if (!user || !profileName) return;
+        
+        try {
+          const cleanCode = code.trim().toUpperCase();
+          const tripToJoin = trips.find(t => t?.inviteCode === cleanCode);
+          
+          if (tripToJoin) {
+            if (!tripToJoin.participants.includes(profileName)) {
+              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
+                participants: arrayUnion(profileName)
+              });
+            }
+            setShowJoinTripModal(false);
+            setCurrentTripId(tripToJoin.id); 
+          } else {
+            alert(`No encontramos ningún viaje con el código "${cleanCode}". Por favor, verifica que esté bien escrito.`);
+          }
+        } catch (error) {
+          console.error("Error al unirse al viaje:", error);
+          alert("Hubo un error de conexión al intentar unirte. Inténtalo de nuevo.");
+        }
+      };
+
+      const handleSaveExpense = async (expenseData) => {
+        if (!user || !currentTripId) return;
+        
+        if (expenseToEdit) {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseToEdit.id), {
+            ...expenseData
+          });
+        } else {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
+            ...expenseData,
+            tripId: currentTripId,
+            createdAt: Date.now(),
+            addedBy: user.uid
+          });
+        }
+        setShowNewExpenseModal(false);
+        setExpenseToEdit(null);
+      };
+
+      const handleSettleDebt = async (transfer) => {
+        if (!user || !currentTripId) return;
+        
+        const tripToUpdate = trips.find(t => t.id === currentTripId);
+        const baseCurrency = tripToUpdate?.baseCurrency || 'USD';
+
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
+          description: `Pago de ${transfer.from} a ${transfer.to}`,
+          amount: transfer.amount,
+          convertedAmount: transfer.amount,
+          currency: baseCurrency,
+          exchangeRate: 1,
+          date: new Date().toISOString().split('T')[0],
+          paidBy: transfer.from,
+          splitAmong: [transfer.to],
+          isSettlement: true,
+          tripId: currentTripId,
+          createdAt: Date.now(),
+          addedBy: user.uid
+        });
+      };
+
+      const openEditExpense = (expense) => {
+        setExpenseToEdit(expense);
+        setShowNewExpenseModal(true);
+      };
+
+      const handleDeleteExpense = async (expenseId) => {
+        if (!user) return;
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseId));
+      };
+
+      const handleDeleteTrip = async () => {
+        if (!user || !tripToDelete) return;
+        
+        const relatedExpenses = expenses.filter(e => e.tripId === tripToDelete.id);
+        for (const exp of relatedExpenses) {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
+        }
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToDelete.id));
+        
+        setTripToDelete(null);
+        setCurrentTripId(null);
+      };
+
+      // --- Renderizado ---
+      if (!user || !isProfileLoaded) {
+        return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="animate-pulse flex flex-col items-center">
+              <Icon name="Plane" className="w-12 h-12 text-emerald-500 mb-4" />
+              <p className="text-slate-500 font-medium">Cargando SplitMate...</p>
+            </div>
+          </div>
+        );
+      }
+
+      if (!profileName) {
+        return <WelcomeScreen onSave={handleSaveProfile} />;
+      }
+
+      const myTrips = trips.filter(t => t.participants.includes(profileName));
+      const currentTrip = trips.find(t => t.id === currentTripId);
+      const tripExpenses = expenses.filter(e => e.tripId === currentTripId);
+
+      return (
+        <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-20">
+          <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl relative overflow-hidden">
+            
+            <header className="bg-emerald-600 text-white p-4 sticky top-0 z-10 shadow-md">
+              <div className="flex items-center justify-between">
+                {currentTripId ? (
+                  <button onClick={() => setCurrentTripId(null)} className="flex items-center text-emerald-50 hover:text-white transition-colors">
+                    <Icon name="ChevronLeft" className="w-6 h-6 mr-1" />
+                    <span className="font-medium">Volver</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Icon name="Plane" className="w-6 h-6" />
+                    <h1 className="text-xl font-bold tracking-tight">SplitMate</h1>
+                  </div>
+                )}
+                
+                {currentTripId ? (
+                  <h1 className="text-lg font-bold truncate max-w-[200px]">{currentTrip?.name}</h1>
+                ) : (
+                  <div className="flex items-center text-sm font-medium text-emerald-100">
+                    <Icon name="Users" className="w-4 h-4 mr-1" /> {profileName}
+                  </div>
+                )}
+              </div>
+            </header>
+
+            <main className="p-4">
+              {!currentTripId ? (
+                <Dashboard 
+                  trips={myTrips} 
+                  onSelectTrip={setCurrentTripId} 
+                  onNewTrip={() => setShowNewTripModal(true)} 
+                  onJoinTrip={() => setShowJoinTripModal(true)}
+                />
+              ) : (
+                <TripDetail 
+                  trip={currentTrip} 
+                  expenses={tripExpenses} 
+                  onAddExpense={() => { setExpenseToEdit(null); setShowNewExpenseModal(true); }}
+                  onEditExpense={openEditExpense}
+                  onDeleteExpense={handleDeleteExpense}
+                  onDeleteTrip={() => setTripToDelete(currentTrip)}
+                  onSettleDebt={handleSettleDebt}
+                />
+              )}
+            </main>
+
+            {showNewTripModal && (
+              <NewTripModal 
+                onClose={() => setShowNewTripModal(false)} 
+                onSubmit={handleCreateTrip} 
+              />
+            )}
+
+            {showJoinTripModal && (
+              <JoinTripModal 
+                onClose={() => setShowJoinTripModal(false)}
+                onSubmit={handleJoinTrip}
+              />
+            )}
+
+            {showNewExpenseModal && currentTrip && (
+              <NewExpenseModal 
+                trip={currentTrip}
+                expenseToEdit={expenseToEdit}
+                onClose={() => { setShowNewExpenseModal(false); setExpenseToEdit(null); }} 
+                onSubmit={handleSaveExpense} 
+              />
+            )}
+
+            {tripToDelete && (
+              <ConfirmModal 
+                title="Eliminar Viaje"
+                message={`¿Estás seguro de que quieres eliminar "${tripToDelete.name}"? Esto también borrará todos los gastos asociados. Esta acción no se puede deshacer.`}
+                onCancel={() => setTripToDelete(null)}
+                onConfirm={handleDeleteTrip}
+              />
+            )}
+
+          </div>
+        </div>
+      );
+    }
+
+    // --- Sub-Componentes ---
+
+    function Dashboard({ trips, onSelectTrip, onNewTrip, onJoinTrip }) {
+      return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 text-center">
+            <h2 className="text-emerald-800 font-bold text-lg mb-2">¿Viajas con amigos?</h2>
+            <p className="text-emerald-600 text-sm mb-4">Crea un viaje o únete a uno existente usando un código de invitación.</p>
+            <div className="flex flex-col space-y-3">
+              <button 
+                onClick={onNewTrip}
+                className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all"
+              >
+                <Icon name="Plus" className="w-5 h-5" />
+                <span>Crear Nuevo Viaje</span>
               </button>
+              <button 
+                onClick={onJoinTrip}
+                className="bg-white text-emerald-700 border-2 border-emerald-200 px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 hover:bg-emerald-50 active:scale-95 transition-all"
+              >
+                <Icon name="Key" className="w-5 h-5" />
+                <span>Unirse con Código</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-slate-500 font-bold uppercase tracking-wider text-xs mb-3 ml-1">Tus Viajes</h3>
+            {trips.length === 0 ? (
+              <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-slate-400">Aún no hay viajes. ¡Toca arriba para empezar!</p>
+              </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <Plane className="w-6 h-6" />
-                <h1 className="text-xl font-bold tracking-tight">SplitMate</h1>
+              <div className="space-y-3">
+                {trips.map(trip => (
+                  <button 
+                    key={trip.id}
+                    onClick={() => onSelectTrip(trip.id)}
+                    className="w-full text-left bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:border-emerald-300 hover:shadow-md transition-all flex items-center justify-between group"
+                  >
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-lg">{trip.name}</h4>
+                      <div className="flex items-center text-slate-500 text-sm mt-1 space-x-3">
+                        <span className="flex items-center"><Icon name="Users" className="w-4 h-4 mr-1.5" />{trip.participants.length} participantes</span>
+                        {(trip.startDate || trip.endDate || trip.date) && (
+                          <span className="text-xs font-medium bg-slate-100 px-2 py-0.5 rounded-md flex items-center">
+                            <Icon name="Calendar" className="w-3 h-3 mr-1 text-slate-400" />
+                            {formatDateRange(trip.startDate || trip.date, trip.endDate)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Icon name="ArrowRight" className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function TripDetail({ trip, expenses, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onSettleDebt }) {
+      const [activeTab, setActiveTab] = useState('expenses');
+
+      const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
+      const transfers = useMemo(() => simplifyDebts(balances), [balances]);
+
+      const baseCurrency = trip.baseCurrency || 'USD';
+      const currencySymbol = CURRENCIES[baseCurrency]?.symbol || '$';
+
+      const totalSpent = expenses
+        .filter(exp => !exp.isSettlement)
+        .reduce((sum, exp) => sum + (exp.convertedAmount !== undefined ? Number(exp.convertedAmount) : Number(exp.amount)), 0);
+
+      const copyCode = () => {
+        const textArea = document.createElement("textarea");
+        textArea.value = trip.inviteCode;
+        textArea.style.position = "absolute";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        
+        try {
+          document.execCommand('copy');
+          alert(`¡Código ${trip.inviteCode} copiado al portapapeles! Dáselo a tus amigos.`);
+        } catch(e) {
+          console.error("Error al copiar: ", e);
+          alert(`No se pudo copiar el código. Por favor cópialo manualmente: ${trip.inviteCode}`);
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      };
+
+      return (
+        <div className="animate-in fade-in duration-300">
+          <div className="bg-slate-800 rounded-2xl p-5 text-white mb-6 shadow-lg shadow-slate-300 relative">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-300 text-sm font-medium">Gastos Totales del Viaje</p>
+                <h2 className="text-3xl font-bold mt-1">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
+              </div>
+              <button 
+                onClick={onDeleteTrip}
+                className="text-slate-400 hover:text-red-400 transition-colors p-2 -mr-2 -mt-2"
+                title="Eliminar Viaje"
+              >
+                <Icon name="Trash2" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {trip.inviteCode && (
+              <div className="mt-4 bg-slate-700/50 rounded-xl p-3 border border-slate-600 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-300 font-medium">Código de Invitación</p>
+                  <p className="text-lg font-mono font-bold tracking-widest text-emerald-400">{trip.inviteCode}</p>
+                </div>
+                <button onClick={copyCode} className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" title="Copiar código">
+                  <Icon name="Copy" className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              {trip.participants.map(p => (
+                <span key={p} className="bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-full font-medium">
+                  {p}
+                </span>
+              ))}
+            </div>
+            {(trip.startDate || trip.endDate || trip.date) && (
+              <div className="mt-3 flex items-center text-slate-300 text-xs font-medium">
+                <Icon name="Calendar" className="w-4 h-4 mr-1.5" />
+                {formatDateRange(trip.startDate || trip.date, trip.endDate)}
+              </div>
+            )}
+          </div>
+
+          <div className="flex bg-slate-200 rounded-xl p-1 mb-6">
+            <button 
+              onClick={() => setActiveTab('expenses')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+            >
+              Gastos
+            </button>
+            <button 
+              onClick={() => setActiveTab('balances')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}
+            >
+              Liquidar Deudas
+            </button>
+          </div>
+
+          {activeTab === 'expenses' && (
+            <div className="space-y-4">
+              <button 
+                onClick={onAddExpense}
+                className="w-full bg-emerald-100 text-emerald-700 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-200 active:scale-95 transition-all"
+              >
+                <Icon name="Receipt" className="w-5 h-5" />
+                <span>Añadir un Gasto</span>
+              </button>
+
+              {expenses.length === 0 ? (
+                <div className="text-center p-8">
+                  <p className="text-slate-400">Aún no hay gastos registrados.</p>
+                </div>
+              ) : (
+                <div className="space-y-3 pb-8">
+                  {expenses.map(exp => {
+                    const icon = getExpenseIcon(exp.description, exp.isSettlement);
+                    return (
+                      <div key={exp.id} className={`bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between ${exp.isSettlement ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100'}`}>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xl leading-none">{icon}</span>
+                            <h4 className={`font-bold ${exp.isSettlement ? 'text-emerald-800' : 'text-slate-800'}`}>{exp.description}</h4>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 ml-7">
+                            Pagado por <span className="font-bold text-slate-700">{exp.paidBy}</span>
+                            {exp.date && <span className="ml-1.5 font-medium text-slate-400">• {formatDate(exp.date)}</span>}
+                          </p>
+                          {!exp.isSettlement && (
+                            <p className="text-xs text-slate-400 mt-1 ml-7 flex flex-wrap gap-1 items-center">
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] uppercase">Dividido con</span> 
+                              {exp.splitAmong.length === trip.participants.length 
+                                ? 'Todos' 
+                                : exp.splitAmong.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right ml-4 flex flex-col items-end">
+                          <span className={`font-bold text-lg ${exp.isSettlement ? 'text-emerald-600' : 'text-slate-800'}`}>
+                            {exp.currency && exp.currency !== baseCurrency ? (
+                              <div className="flex flex-col items-end">
+                                <span>{CURRENCIES[exp.currency]?.symbol || '$'}{Number(exp.amount).toFixed(2)}</span>
+                                <span className="text-xs text-slate-400 font-medium">~{currencySymbol}{Number(exp.convertedAmount).toFixed(2)} <span className="text-[10px]">{baseCurrency}</span></span>
+                              </div>
+                            ) : (
+                              <span>{currencySymbol}{Number(exp.amount).toFixed(2)}</span>
+                            )}
+                          </span>
+                          <div className="flex space-x-1 mt-2">
+                            <button 
+                              onClick={() => onEditExpense(exp)}
+                              className="text-slate-300 hover:text-blue-500 transition-colors p-1"
+                              title="Editar gasto"
+                            >
+                              <Icon name="Pencil" className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => onDeleteExpense(exp.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                              title="Eliminar gasto"
+                            >
+                              <Icon name="Trash2" className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'balances' && (
+            <div className="space-y-4 pb-8">
+              <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4">
+                <h3 className="font-bold text-emerald-800 flex items-center">
+                  <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> 
+                  Deudas Simplificadas
+                </h3>
+                <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas.</p>
+              </div>
+
+              {transfers.length === 0 ? (
+                <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Icon name="CheckSquare" className="w-8 h-8" />
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-lg">¡Todo saldado!</h4>
+                  <p className="text-slate-500 mt-1 text-sm">Nadie debe nada en este momento.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {transfers.map((t, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="font-bold text-slate-700">{t.from}</div>
+                        <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
+                        <div className="font-bold text-slate-700">{t.to}</div>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
+                        <div className="font-bold text-emerald-600 text-lg">
+                          {currencySymbol}{t.amount.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span>
+                        </div>
+                        <button 
+                          onClick={() => onSettleDebt(t)}
+                          className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
+                        >
+                          Marcar Pagado
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function NewTripModal({ onClose, onSubmit }) {
+      const [name, setName] = useState('');
+      const [baseCurrency, setBaseCurrency] = useState('USD');
+      const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+      
+      const [endDate, setEndDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 3);
+        return d.toISOString().split('T')[0];
+      });
+      
+      const [participants, setParticipants] = useState(['', '']);
+      const [error, setError] = useState('');
+
+      const handleAddParticipant = () => setParticipants([...participants, '']);
+      const handleRemoveParticipant = (index) => {
+        const newP = [...participants];
+        newP.splice(index, 1);
+        setParticipants(newP);
+      };
+      const handleChangeParticipant = (index, value) => {
+        const newP = [...participants];
+        newP[index] = value;
+        setParticipants(newP);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setError('');
+        const cleanParticipants = participants.map(p => p.trim()).filter(p => p !== '');
+        if (!name.trim() || cleanParticipants.length < 2) {
+          setError("Por favor ingresa un nombre y al menos 2 participantes.");
+          return;
+        }
+        if (startDate && endDate && startDate > endDate) {
+          setError("La fecha de inicio no puede ser posterior a la fecha de fin.");
+          return;
+        }
+        const uniqueParticipants = [...new Set(cleanParticipants)];
+        onSubmit({ name, baseCurrency, startDate, endDate, participants: uniqueParticipants });
+      };
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">Crear Nuevo Viaje</h2>
+            
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl flex items-center text-sm font-medium">
+                <Icon name="AlertCircle" className="w-4 h-4 mr-2 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Nombre del Viaje</label>
+                <input 
+                  type="text" 
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Ej. Verano en Madrid" 
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 placeholder-slate-400"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Moneda Principal del Viaje</label>
+                <div className="relative">
+                  <Icon name="Globe" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <select 
+                    value={baseCurrency}
+                    onChange={e => setBaseCurrency(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl pl-10 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white appearance-none"
+                  >
+                    {Object.entries(CURRENCIES).map(([code, { name }]) => (
+                      <option key={code} value={code}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex space-x-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Desde (Opcional)</label>
+                  <input 
+                    type="date" 
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Hasta (Opcional)</label>
+                  <input 
+                    type="date" 
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quiénes van?</label>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-2 pb-2">
+                  {participants.map((p, i) => (
+                    <div key={i} className="flex items-center space-x-2">
+                      <input 
+                        type="text" 
+                        value={p}
+                        onChange={e => handleChangeParticipant(i, e.target.value)}
+                        placeholder={`Persona ${i + 1}`} 
+                        className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:outline-none transition-colors"
+                      />
+                      {participants.length > 2 && (
+                        <button type="button" onClick={() => handleRemoveParticipant(i)} className="p-2 text-slate-400 hover:text-red-500">
+                          <Icon name="Trash2" className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  type="button" 
+                  onClick={handleAddParticipant}
+                  className="text-emerald-600 font-bold text-sm mt-3 flex items-center hover:text-emerald-700"
+                >
+                  <Icon name="Plus" className="w-4 h-4 mr-1" /> Añadir otra persona
+                </button>
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
+                  Crear Viaje
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function NewExpenseModal({ trip, expenseToEdit, onClose, onSubmit }) {
+      const tripCurrency = trip.baseCurrency || 'USD';
+      const [description, setDescription] = useState(expenseToEdit ? expenseToEdit.description : '');
+      const [amount, setAmount] = useState(expenseToEdit ? expenseToEdit.amount.toString() : '');
+      const [date, setDate] = useState(expenseToEdit ? (expenseToEdit.date || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0]);
+      const [currency, setCurrency] = useState(expenseToEdit ? (expenseToEdit.currency || tripCurrency) : tripCurrency);
+      const [exchangeRate, setExchangeRate] = useState(expenseToEdit ? (expenseToEdit.exchangeRate || 1) : 1);
+      const [isFetchingRate, setIsFetchingRate] = useState(false);
+      const [paidBy, setPaidBy] = useState(expenseToEdit ? expenseToEdit.paidBy : trip.participants[0]);
+      const [splitAmong, setSplitAmong] = useState(expenseToEdit ? expenseToEdit.splitAmong : [...trip.participants]);
+      const [error, setError] = useState('');
+
+      const toggleParticipant = (p) => {
+        if (splitAmong.includes(p)) {
+          setSplitAmong(splitAmong.filter(x => x !== p));
+        } else {
+          setSplitAmong([...splitAmong, p]);
+        }
+      };
+
+      const selectAll = () => setSplitAmong([...trip.participants]);
+
+      const handleCurrencyChange = async (newCurrency) => {
+        setCurrency(newCurrency);
+        if (newCurrency === tripCurrency) {
+          setExchangeRate(1);
+          return;
+        }
+        
+        setIsFetchingRate(true);
+        try {
+          const res = await fetch(`https://open.er-api.com/v6/latest/${newCurrency}`);
+          const data = await res.json();
+          const rate = data.rates[tripCurrency];
+          if (rate) setExchangeRate(rate);
+        } catch (e) {
+          console.error("Error fetching rate", e);
+        } finally {
+          setIsFetchingRate(false);
+        }
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setError('');
+        
+        const parsedAmount = parseFloat(amount.toString().replace(',', '.'));
+        const parsedRate = parseFloat(exchangeRate.toString().replace(',', '.'));
+
+        if (!description.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
+          setError("Por favor ingresa una descripción y cantidad válida.");
+          return;
+        }
+        if (isNaN(parsedRate) || parsedRate <= 0) {
+          setError("Por favor ingresa una tasa de cambio válida.");
+          return;
+        }
+        if (splitAmong.length === 0) {
+          setError("Al menos una persona debe ser seleccionada para dividir.");
+          return;
+        }
+        
+        const convertedAmount = currency === tripCurrency ? parsedAmount : parsedAmount * parsedRate;
+
+        onSubmit({
+          description,
+          amount: parsedAmount,
+          date,
+          currency,
+          exchangeRate: parsedRate,
+          convertedAmount,
+          paidBy,
+          splitAmong
+        });
+      };
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">{expenseToEdit ? 'Editar Gasto' : 'Añadir Gasto'}</h2>
+            
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl flex items-center text-sm font-medium">
+                <Icon name="AlertCircle" className="w-4 h-4 mr-2 flex-shrink-0" />
+                {error}
               </div>
             )}
             
-            {currentTripId ? (
-              <h1 className="text-lg font-bold truncate max-w-[200px]">{currentTrip?.name}</h1>
-            ) : (
-              <div className="flex items-center text-sm font-medium text-emerald-100">
-                <Users className="w-4 h-4 mr-1" /> {profileName}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Para qué fue esto?</label>
+                <input 
+                  type="text" 
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Ej. Cena en pizzería" 
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors text-slate-800 placeholder-slate-400 font-medium"
+                  autoFocus
+                />
               </div>
-            )}
-          </div>
-        </header>
 
-        {/* Main Content Area */}
-        <main className="p-4">
-          {!currentTripId ? (
-            <Dashboard 
-              trips={myTrips} 
-              onSelectTrip={setCurrentTripId} 
-              onNewTrip={() => setShowNewTripModal(true)} 
-              onJoinTrip={() => setShowJoinTripModal(true)}
-            />
-          ) : (
-            <TripDetail 
-              trip={currentTrip} 
-              expenses={tripExpenses} 
-              onAddExpense={() => { setExpenseToEdit(null); setShowNewExpenseModal(true); }}
-              onEditExpense={openEditExpense}
-              onDeleteExpense={handleDeleteExpense}
-              onDeleteTrip={() => setTripToDelete(currentTrip)}
-              onSettleDebt={handleSettleDebt}
-            />
-          )}
-        </main>
-
-        {/* Modals */}
-        {showNewTripModal && (
-          <NewTripModal 
-            onClose={() => setShowNewTripModal(false)} 
-            onSubmit={handleCreateTrip} 
-          />
-        )}
-
-        {showJoinTripModal && (
-          <JoinTripModal 
-            onClose={() => setShowJoinTripModal(false)}
-            onSubmit={handleJoinTrip}
-          />
-        )}
-
-        {showNewExpenseModal && currentTrip && (
-          <NewExpenseModal 
-            trip={currentTrip}
-            expenseToEdit={expenseToEdit}
-            onClose={() => { setShowNewExpenseModal(false); setExpenseToEdit(null); }} 
-            onSubmit={handleSaveExpense} 
-          />
-        )}
-
-        {tripToDelete && (
-          <ConfirmModal 
-            title="Eliminar Viaje"
-            message={`¿Estás seguro de que quieres eliminar "${tripToDelete.name}"? Esto también borrará todos los gastos asociados. Esta acción no se puede deshacer.`}
-            onCancel={() => setTripToDelete(null)}
-            onConfirm={handleDeleteTrip}
-          />
-        )}
-
-      </div>
-    </div>
-  );
-}
-
-// --- Sub-Components ---
-
-function Dashboard({ trips, onSelectTrip, onNewTrip, onJoinTrip }) {
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 text-center">
-        <h2 className="text-emerald-800 font-bold text-lg mb-2">¿Viajas con amigos?</h2>
-        <p className="text-emerald-600 text-sm mb-4">Crea un viaje o únete a uno existente usando un código de invitación.</p>
-        <div className="flex flex-col space-y-3">
-          <button 
-            onClick={onNewTrip}
-            className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Crear Nuevo Viaje</span>
-          </button>
-          <button 
-            onClick={onJoinTrip}
-            className="bg-white text-emerald-700 border-2 border-emerald-200 px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 hover:bg-emerald-50 active:scale-95 transition-all"
-          >
-            <Key className="w-5 h-5" />
-            <span>Unirse con Código</span>
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-slate-500 font-bold uppercase tracking-wider text-xs mb-3 ml-1">Tus Viajes</h3>
-        {trips.length === 0 ? (
-          <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            <p className="text-slate-400">Aún no hay viajes. ¡Toca arriba para empezar!</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {trips.map(trip => (
-              <button 
-                key={trip.id}
-                onClick={() => onSelectTrip(trip.id)}
-                className="w-full text-left bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:border-emerald-300 hover:shadow-md transition-all flex items-center justify-between group"
-              >
-                <div>
-                  <h4 className="font-bold text-slate-800 text-lg">{trip.name}</h4>
-                  <div className="flex items-center text-slate-500 text-sm mt-1 space-x-3">
-                    <span className="flex items-center"><Users className="w-4 h-4 mr-1.5" />{trip.participants.length} participantes</span>
-                    {(trip.startDate || trip.endDate || trip.date) && (
-                      <span className="text-xs font-medium bg-slate-100 px-2 py-0.5 rounded-md flex items-center">
-                        <Calendar className="w-3 h-3 mr-1 text-slate-400" />
-                        {formatDateRange(trip.startDate || trip.date, trip.endDate)}
-                      </span>
-                    )}
+              <div className="flex space-x-3">
+                <div className="flex-[2]">
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Cuánto fue?</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{CURRENCIES[currency]?.symbol || '$'}</span>
+                    <input 
+                      type="text" 
+                      inputMode="decimal"
+                      value={amount}
+                      onChange={e => setAmount(e.target.value)}
+                      placeholder="0.00" 
+                      className="w-full border-2 border-slate-200 rounded-xl pl-8 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800"
+                    />
                   </div>
                 </div>
-                <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TripDetail({ trip, expenses, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onSettleDebt }) {
-  const [activeTab, setActiveTab] = useState('expenses'); // 'expenses' | 'balances'
-
-  const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
-  const transfers = useMemo(() => simplifyDebts(balances), [balances]);
-
-  // Solo sumar gastos reales (no liquidaciones) para el total gastado
-  const totalSpent = expenses
-    .filter(exp => !exp.isSettlement)
-    .reduce((sum, exp) => sum + Number(exp.amount), 0);
-
-  const copyCode = () => {
-    try {
-      // Intenta usar la API moderna del portapapeles si está disponible
-      navigator.clipboard.writeText(trip.inviteCode);
-    } catch(e) {
-      // Fallback 
-      document.execCommand('copy');
-    }
-    // Una alerta rápida visual usando JS nativo (idealmente reemplazar por un toast, pero funcional)
-    alert(`¡Código ${trip.inviteCode} copiado al portapapeles! Dáselo a tus amigos.`);
-  };
-
-  return (
-    <div className="animate-in fade-in duration-300">
-      {/* Overview Card */}
-      <div className="bg-slate-800 rounded-2xl p-5 text-white mb-6 shadow-lg shadow-slate-300 relative">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-slate-300 text-sm font-medium">Gastos Totales del Viaje</p>
-            <h2 className="text-3xl font-bold mt-1">${totalSpent.toFixed(2)}</h2>
-          </div>
-          <button 
-            onClick={onDeleteTrip}
-            className="text-slate-400 hover:text-red-400 transition-colors p-2 -mr-2 -mt-2"
-            title="Eliminar Viaje"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Sección de Código de Invitación */}
-        {trip.inviteCode && (
-          <div className="mt-4 bg-slate-700/50 rounded-xl p-3 border border-slate-600 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-300 font-medium">Código de Invitación</p>
-              <p className="text-lg font-mono font-bold tracking-widest text-emerald-400">{trip.inviteCode}</p>
-            </div>
-            <button onClick={copyCode} className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" title="Copiar código">
-              <Copy className="w-4 h-4 text-white" />
-            </button>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2 mt-4">
-          {trip.participants.map(p => (
-            <span key={p} className="bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-full font-medium">
-              {p}
-            </span>
-          ))}
-        </div>
-        {(trip.startDate || trip.endDate || trip.date) && (
-          <div className="mt-3 flex items-center text-slate-300 text-xs font-medium">
-            <Calendar className="w-4 h-4 mr-1.5" />
-            {formatDateRange(trip.startDate || trip.date, trip.endDate)}
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div className="flex bg-slate-200 rounded-xl p-1 mb-6">
-        <button 
-          onClick={() => setActiveTab('expenses')}
-          className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-        >
-          Gastos
-        </button>
-        <button 
-          onClick={() => setActiveTab('balances')}
-          className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}
-        >
-          Liquidar Deudas
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'expenses' && (
-        <div className="space-y-4">
-          <button 
-            onClick={onAddExpense}
-            className="w-full bg-emerald-100 text-emerald-700 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-200 active:scale-95 transition-all"
-          >
-            <Receipt className="w-5 h-5" />
-            <span>Añadir un Gasto</span>
-          </button>
-
-          {expenses.length === 0 ? (
-            <div className="text-center p-8">
-              <p className="text-slate-400">Aún no hay gastos registrados.</p>
-            </div>
-          ) : (
-            <div className="space-y-3 pb-8">
-              {expenses.map(exp => {
-                const icon = getExpenseIcon(exp.description, exp.isSettlement);
-                return (
-                  <div key={exp.id} className={`bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between ${exp.isSettlement ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100'}`}>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xl leading-none">{icon}</span>
-                        <h4 className={`font-bold ${exp.isSettlement ? 'text-emerald-800' : 'text-slate-800'}`}>{exp.description}</h4>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 ml-7">
-                        Pagado por <span className="font-bold text-slate-700">{exp.paidBy}</span>
-                      </p>
-                      {!exp.isSettlement && (
-                        <p className="text-xs text-slate-400 mt-1 ml-7 flex flex-wrap gap-1 items-center">
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] uppercase">Dividido con</span> 
-                          {exp.splitAmong.length === trip.participants.length 
-                            ? 'Todos' 
-                            : exp.splitAmong.join(', ')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right ml-4 flex flex-col items-end">
-                      <span className={`font-bold text-lg ${exp.isSettlement ? 'text-emerald-600' : 'text-slate-800'}`}>${Number(exp.amount).toFixed(2)}</span>
-                      <div className="flex space-x-1 mt-2">
-                        <button 
-                          onClick={() => onEditExpense(exp)}
-                          className="text-slate-300 hover:text-blue-500 transition-colors p-1"
-                          title="Editar gasto"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => onDeleteExpense(exp.id)}
-                          className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'balances' && (
-        <div className="space-y-4 pb-8">
-          <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4">
-            <h3 className="font-bold text-emerald-800 flex items-center">
-              <BadgeDollarSign className="w-5 h-5 mr-2" /> 
-              Deudas Simplificadas
-            </h3>
-            <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas.</p>
-          </div>
-
-          {transfers.length === 0 ? (
-            <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl shadow-sm">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckSquare className="w-8 h-8" />
-              </div>
-              <h4 className="font-bold text-slate-800 text-lg">¡Todo saldado!</h4>
-              <p className="text-slate-500 mt-1 text-sm">Nadie debe nada en este momento.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {transfers.map((t, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="font-bold text-slate-700">{t.from}</div>
-                    <ArrowRight className="w-4 h-4 text-slate-400" />
-                    <div className="font-bold text-slate-700">{t.to}</div>
-                  </div>
-                  <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
-                    <div className="font-bold text-emerald-600 text-lg">
-                      ${t.amount.toFixed(2)}
-                    </div>
-                    <button 
-                      onClick={() => onSettleDebt(t)}
-                      className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
-                    >
-                      Marcar Pagado
-                    </button>
-                  </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Moneda</label>
+                  <select 
+                    value={currency}
+                    onChange={e => handleCurrencyChange(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white"
+                  >
+                    {Object.keys(CURRENCIES).map((code) => (
+                      <option key={code} value={code}>{code}</option>
+                    ))}
+                  </select>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+              </div>
 
-// --- Modals ---
-
-function NewTripModal({ onClose, onSubmit }) {
-  const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  // Por defecto, ponemos la fecha de fin 3 días después de hoy
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
-    return d.toISOString().split('T')[0];
-  });
-  
-  const [participants, setParticipants] = useState(['', '']);
-  const [error, setError] = useState('');
-
-  const handleAddParticipant = () => setParticipants([...participants, '']);
-  const handleRemoveParticipant = (index) => {
-    const newP = [...participants];
-    newP.splice(index, 1);
-    setParticipants(newP);
-  };
-  const handleChangeParticipant = (index, value) => {
-    const newP = [...participants];
-    newP[index] = value;
-    setParticipants(newP);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    const cleanParticipants = participants.map(p => p.trim()).filter(p => p !== '');
-    if (!name.trim() || cleanParticipants.length < 2) {
-      setError("Por favor ingresa un nombre y al menos 2 participantes.");
-      return;
-    }
-    if (startDate && endDate && startDate > endDate) {
-      setError("La fecha de inicio no puede ser posterior a la fecha de fin.");
-      return;
-    }
-    // Remove duplicates
-    const uniqueParticipants = [...new Set(cleanParticipants)];
-    onSubmit({ name, startDate, endDate, participants: uniqueParticipants });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Crear Nuevo Viaje</h2>
-        
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl flex items-center text-sm font-medium">
-            <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-1.5">Nombre del Viaje</label>
-            <input 
-              type="text" 
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Ej. Verano en Madrid" 
-              className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 placeholder-slate-400"
-              autoFocus
-            />
-          </div>
-
-          <div className="flex space-x-3">
-            <div className="flex-1">
-              <label className="block text-sm font-bold text-slate-600 mb-1.5">Desde (Opcional)</label>
-              <input 
-                type="date" 
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-bold text-slate-600 mb-1.5">Hasta (Opcional)</label>
-              <input 
-                type="date" 
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quiénes van?</label>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-2 pb-2">
-              {participants.map((p, i) => (
-                <div key={i} className="flex items-center space-x-2">
+              {currency !== tripCurrency && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-500 flex items-center">
+                      <Icon name="RefreshCw" className={`w-3 h-3 mr-1 ${isFetchingRate ? 'animate-spin' : ''}`} />
+                      Tasa de cambio (1 {currency} = X {tripCurrency})
+                    </label>
+                  </div>
                   <input 
                     type="text" 
-                    value={p}
-                    onChange={e => handleChangeParticipant(i, e.target.value)}
-                    placeholder={`Persona ${i + 1}`} 
-                    className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:outline-none transition-colors"
+                    inputMode="decimal"
+                    value={exchangeRate}
+                    onChange={e => setExchangeRate(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none transition-colors text-sm font-medium text-slate-700"
                   />
-                  {participants.length > 2 && (
-                    <button type="button" onClick={() => handleRemoveParticipant(i)} className="p-2 text-slate-400 hover:text-red-500">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                  {amount && !isNaN(parseFloat(amount)) && !isNaN(parseFloat(exchangeRate)) && (
+                    <p className="text-xs text-emerald-600 font-medium text-right">
+                      Total en viaje: {CURRENCIES[tripCurrency]?.symbol}{(parseFloat(amount) * parseFloat(exchangeRate)).toFixed(2)} {tripCurrency}
+                    </p>
                   )}
                 </div>
-              ))}
+              )}
+
+              <div className="flex space-x-3">
+                <div className="flex-[2]">
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quién pagó?</label>
+                  <select 
+                    value={paidBy}
+                    onChange={e => setPaidBy(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white"
+                  >
+                    {trip.participants.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Fecha</label>
+                  <input 
+                    type="date" 
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-bold text-slate-600">Dividir entre</label>
+                  <button type="button" onClick={selectAll} className="text-xs text-emerald-600 font-bold hover:underline">
+                    Seleccionar Todos
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {trip.participants.map(p => {
+                    const isSelected = splitAmong.includes(p);
+                    return (
+                      <div 
+                        key={p} 
+                        onClick={() => toggleParticipant(p)}
+                        className={`flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer transition-all ${
+                          isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'
+                        }`}
+                      >
+                        {isSelected ? <Icon name="CheckSquare" className="w-5 h-5 text-emerald-500" /> : <Icon name="Square" className="w-5 h-5 text-slate-300" />}
+                        <span className={`font-medium text-sm ${isSelected ? 'text-emerald-800' : 'text-slate-600'}`}>{p}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
+                  {expenseToEdit ? 'Guardar Cambios' : 'Guardar Gasto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function ConfirmModal({ title, message, onCancel, onConfirm }) {
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200 p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center text-red-600 mb-4">
+              <Icon name="AlertCircle" className="w-6 h-6 mr-2" />
+              <h3 className="text-xl font-bold text-slate-800">{title}</h3>
             </div>
-            <button 
-              type="button" 
-              onClick={handleAddParticipant}
-              className="text-emerald-600 font-bold text-sm mt-3 flex items-center hover:text-emerald-700"
-            >
-              <Plus className="w-4 h-4 mr-1" /> Añadir otra persona
-            </button>
-          </div>
-
-          <div className="pt-4 flex space-x-3">
-            <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-              Crear Viaje
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function NewExpenseModal({ trip, expenseToEdit, onClose, onSubmit }) {
-  const [description, setDescription] = useState(expenseToEdit ? expenseToEdit.description : '');
-  const [amount, setAmount] = useState(expenseToEdit ? expenseToEdit.amount.toString() : '');
-  const [paidBy, setPaidBy] = useState(expenseToEdit ? expenseToEdit.paidBy : trip.participants[0]);
-  const [splitAmong, setSplitAmong] = useState(expenseToEdit ? expenseToEdit.splitAmong : [...trip.participants]);
-  const [error, setError] = useState('');
-
-  const toggleParticipant = (p) => {
-    if (splitAmong.includes(p)) {
-      setSplitAmong(splitAmong.filter(x => x !== p));
-    } else {
-      setSplitAmong([...splitAmong, p]);
-    }
-  };
-
-  const selectAll = () => setSplitAmong([...trip.participants]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    
-    // Parse amount correctly regardless of using comma or dot
-    const parsedAmount = parseFloat(amount.toString().replace(',', '.'));
-
-    if (!description.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
-      setError("Por favor ingresa una descripción y cantidad válida.");
-      return;
-    }
-    if (splitAmong.length === 0) {
-      setError("Al menos una persona debe ser seleccionada para dividir.");
-      return;
-    }
-    
-    onSubmit({
-      description,
-      amount: parsedAmount,
-      paidBy,
-      splitAmong
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">{expenseToEdit ? 'Editar Gasto' : 'Añadir Gasto'}</h2>
-        
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl flex items-center text-sm font-medium">
-            <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Para qué fue esto?</label>
-            <input 
-              type="text" 
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Ej. Cena en pizzería" 
-              className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors text-slate-800 placeholder-slate-400 font-medium"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Cuánto fue?</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-              <input 
-                type="text" 
-                inputMode="decimal"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="0.00" 
-                className="w-full border-2 border-slate-200 rounded-xl pl-8 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quién pagó?</label>
-            <select 
-              value={paidBy}
-              onChange={e => setPaidBy(e.target.value)}
-              className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white"
-            >
-              {trip.participants.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-bold text-slate-600">Dividir entre</label>
-              <button type="button" onClick={selectAll} className="text-xs text-emerald-600 font-bold hover:underline">
-                Seleccionar Todos
+            <p className="text-slate-600 mb-6 font-medium">{message}</p>
+            <div className="flex space-x-3">
+              <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={onConfirm} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">
+                Eliminar
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {trip.participants.map(p => {
-                const isSelected = splitAmong.includes(p);
-                return (
-                  <div 
-                    key={p} 
-                    onClick={() => toggleParticipant(p)}
-                    className={`flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer transition-all ${
-                      isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'
-                    }`}
-                  >
-                    {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5 text-slate-300" />}
-                    <span className={`font-medium text-sm ${isSelected ? 'text-emerald-800' : 'text-slate-600'}`}>{p}</span>
-                  </div>
-                );
-              })}
+          </div>
+        </div>
+      );
+    }
+
+    function WelcomeScreen({ onSave }) {
+      const [name, setName] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim()) onSave(name.trim());
+      };
+
+      return (
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
+              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
             </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">¡Bienvenido a SplitMate!</h1>
+            <p className="text-slate-500 mb-8 font-medium">Para empezar a compartir gastos y conectarte con amigos, dinos cómo te llamas.</p>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input 
+                type="text" 
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Tu nombre (Ej. Carlos)" 
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center"
+                autoFocus
+              />
+              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">
+                Empezar a usar la app
+              </button>
+            </form>
           </div>
+        </div>
+      );
+    }
 
-          <div className="pt-4 flex space-x-3">
-            <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-              {expenseToEdit ? 'Guardar Cambios' : 'Guardar Gasto'}
-            </button>
+    function JoinTripModal({ onClose, onSubmit }) {
+      const [code, setCode] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (code.trim().length > 0) onSubmit(code.trim());
+      };
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-800">Unirse a un Viaje</h2>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Código de Invitación</label>
+                <input 
+                  type="text" 
+                  value={code}
+                  onChange={e => setCode(e.target.value.toUpperCase())}
+                  placeholder="Ej. ABCDEF" 
+                  maxLength={8}
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-mono font-bold text-slate-800 text-center text-2xl tracking-widest uppercase"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-2 text-center">
+                  Pídele a quien creó el viaje que te comparta el código.
+                </p>
+              </div>
+
+              <div className="pt-2 flex space-x-3">
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
+                  Unirse
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function ConfirmModal({ title, message, onCancel, onConfirm }) {
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200 p-4">
-      <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="flex items-center text-red-600 mb-4">
-          <AlertCircle className="w-6 h-6 mr-2" />
-          <h3 className="text-xl font-bold text-slate-800">{title}</h3>
         </div>
-        <p className="text-slate-600 mb-6 font-medium">{message}</p>
-        <div className="flex space-x-3">
-          <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-            Cancelar
-          </button>
-          <button onClick={onConfirm} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">
-            Eliminar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+      );
+    }
 
-function WelcomeScreen({ onSave }) {
-  const [name, setName] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (name.trim()) onSave(name.trim());
-  };
-
-  return (
-    <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
-      <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-        <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
-          <Plane className="w-8 h-8 text-emerald-600 -rotate-12" />
-        </div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">¡Bienvenido a SplitMate!</h1>
-        <p className="text-slate-500 mb-8 font-medium">Para empezar a compartir gastos y conectarte con amigos, dinos cómo te llamas.</p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input 
-            type="text" 
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Tu nombre (Ej. Carlos)" 
-            className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center"
-            autoFocus
-          />
-          <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">
-            Empezar a usar la app
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function JoinTripModal({ onClose, onSubmit }) {
-  const [code, setCode] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (code.trim().length > 0) onSubmit(code.trim());
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">Unirse a un Viaje</h2>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-bold text-slate-600 mb-1.5">Código de Invitación</label>
-            <input 
-              type="text" 
-              value={code}
-              onChange={e => setCode(e.target.value.toUpperCase())}
-              placeholder="Ej. ABCDEF" 
-              maxLength={6}
-              className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-mono font-bold text-slate-800 text-center text-2xl tracking-widest uppercase"
-              autoFocus
-            />
-            <p className="text-xs text-slate-500 mt-2 text-center">
-              Pídele a quien creó el viaje que te comparta el código de 6 letras.
-            </p>
-          </div>
-
-          <div className="pt-2 flex space-x-3">
-            <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-              Unirse
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+    // --- Iniciar la aplicación de React ---
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
