@@ -12,28 +12,24 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  <!-- Babel (Para poder escribir React/JSX dentro de un archivo HTML) -->
+  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-slate-100">
-  <!-- Aquí es donde React renderizará la aplicación -->
   <div id="root"></div>
 
-  <!-- El código principal de la app -->
   <script type="text/babel" data-type="module">
     // --- Importaciones de Firebase ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-    // --- Hooks de React ---
     const { useState, useEffect, useMemo } = React;
 
     // ==========================================
-    // ⚠️ TU CONFIGURACIÓN DE FIREBASE AQUÍ ⚠️
-    // Reemplaza los valores dentro de este objeto con los de tu proyecto de Firebase.
+    // TUS CREENCIALES DE FIREBASE (ACTUALIZADAS)
     // ==========================================
-    let userFirebaseConfig = {
+    const firebaseConfig = {
       apiKey: "AIzaSyA3hznC34W5T4ZYTkFbp8-GRkiiNFDCuX8",
       authDomain: "splitmate-7e261.firebaseapp.com",
       projectId: "splitmate-7e261",
@@ -42,12 +38,7 @@
       appId: "1:315682667125:web:5e6bc5923b275ee3f4d63c"
     };
 
-    // (Código interno para compatibilidad con el entorno de vista previa)
-    const firebaseConfig = typeof __firebase_config !== 'undefined' && Object.keys(__firebase_config || {}).length > 0 
-      ? JSON.parse(typeof __firebase_config === 'string' ? __firebase_config : JSON.stringify(__firebase_config)) 
-      : userFirebaseConfig;
-
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'splitmate-prod';
+    const appId = 'splitmate-prod'; // ID base para las rutas de Firestore
 
     // Inicializar Firebase
     const app = initializeApp(firebaseConfig);
@@ -55,7 +46,6 @@
     const db = getFirestore(app);
 
     // --- Sistema de Iconos Integrado ---
-    // En lugar de requerir descargas externas, integramos los íconos (Lucide) directamente en formato SVG
     const Icon = ({ name, className }) => {
       const paths = {
         Plane: <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.2-1.1.6L3 8l5 5-3.2 3.2-2.4-.8L1.6 17l4.1 1.3L7 22.4l1.6-.8-.8-2.4 3.2-3.2 5 5l1.2-.7c.4-.2.7-.6.6-1.1z"/>,
@@ -74,7 +64,8 @@
         Copy: <><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></>,
         Globe: <><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></>,
         RefreshCw: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>,
-        Receipt: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></>
+        Receipt: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></>,
+        LogOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>
       };
       return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -178,13 +169,11 @@
 
     function formatDateRange(start, end) {
       if (!start && !end) return null;
-      
       const format = (dStr) => {
         if(!dStr) return '?';
         const [y, m, d] = dStr.split('-');
         return `${d}/${m}/${y.slice(2)}`; 
       };
-      
       if (start && end) return `${format(start)} al ${format(end)}`;
       if (start) return `Desde ${format(start)}`;
       if (end) return `Hasta ${format(end)}`;
@@ -201,7 +190,7 @@
     function App() {
       const [user, setUser] = useState(null);
       const [profileName, setProfileName] = useState(null);
-      const [isProfileLoaded, setIsProfileLoaded] = useState(false);
+      const [isAuthChecking, setIsAuthChecking] = useState(true);
       const [trips, setTrips] = useState([]);
       const [expenses, setExpenses] = useState([]);
       const [currentTripId, setCurrentTripId] = useState(null);
@@ -212,38 +201,24 @@
       const [expenseToEdit, setExpenseToEdit] = useState(null);
       const [tripToDelete, setTripToDelete] = useState(null);
 
-      // --- Autenticación y Obtención de Datos ---
+      // --- Autenticación (GOOGLE AUTH) ---
       useEffect(() => {
-        const initAuth = async () => {
-          try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-              await signInAnonymously(auth);
-            }
-          } catch (error) {
-            console.error("Auth error:", error);
-          }
-        };
-        initAuth();
-
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-          setUser(currentUser);
           if (currentUser) {
-            const profileRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'data');
-            const profileSnap = await getDoc(profileRef);
-            if (profileSnap.exists()) {
-              setProfileName(profileSnap.data().name);
-            }
-            setIsProfileLoaded(true);
+            setUser(currentUser);
+            // Usar el nombre de Google, si no hay, usar el correo sin el @dominio
+            const name = currentUser.displayName || currentUser.email.split('@')[0];
+            setProfileName(name);
           } else {
+            setUser(null);
             setProfileName(null);
-            setIsProfileLoaded(false);
           }
+          setIsAuthChecking(false);
         });
         return () => unsubscribe();
       }, []);
 
+      // --- Obtención de Datos (Firestore) ---
       useEffect(() => {
         if (!user || !profileName) return;
 
@@ -279,12 +254,6 @@
       }, [user, profileName]);
 
       // --- Funciones de Gestión ---
-      const handleSaveProfile = async (name) => {
-        if (!user) return;
-        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data'), { name });
-        setProfileName(name);
-      };
-
       const handleCreateTrip = async (tripData) => {
         if (!user || !profileName) return;
         
@@ -303,7 +272,6 @@
 
       const handleJoinTrip = async (code) => {
         if (!user || !profileName) return;
-        
         try {
           const cleanCode = code.trim().toUpperCase();
           const tripToJoin = trips.find(t => t?.inviteCode === cleanCode);
@@ -327,7 +295,6 @@
 
       const handleSaveExpense = async (expenseData) => {
         if (!user || !currentTripId) return;
-        
         if (expenseToEdit) {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseToEdit.id), {
             ...expenseData
@@ -346,7 +313,6 @@
 
       const handleSettleDebt = async (transfer) => {
         if (!user || !currentTripId) return;
-        
         const tripToUpdate = trips.find(t => t.id === currentTripId);
         const baseCurrency = tripToUpdate?.baseCurrency || 'USD';
 
@@ -378,19 +344,21 @@
 
       const handleDeleteTrip = async () => {
         if (!user || !tripToDelete) return;
-        
         const relatedExpenses = expenses.filter(e => e.tripId === tripToDelete.id);
         for (const exp of relatedExpenses) {
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
         }
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToDelete.id));
-        
         setTripToDelete(null);
         setCurrentTripId(null);
       };
 
+      const handleLogout = () => {
+        signOut(auth).catch(err => console.error("Error cerrando sesión:", err));
+      };
+
       // --- Renderizado ---
-      if (!user || !isProfileLoaded) {
+      if (isAuthChecking) {
         return (
           <div className="min-h-screen bg-slate-50 flex items-center justify-center">
             <div className="animate-pulse flex flex-col items-center">
@@ -401,8 +369,9 @@
         );
       }
 
-      if (!profileName) {
-        return <WelcomeScreen onSave={handleSaveProfile} />;
+      // Si no hay usuario logueado con Google, mostramos la pantalla de Login
+      if (!user) {
+        return <LoginScreen />;
       }
 
       const myTrips = trips.filter(t => t.participants.includes(profileName));
@@ -428,10 +397,14 @@
                 )}
                 
                 {currentTripId ? (
-                  <h1 className="text-lg font-bold truncate max-w-[200px]">{currentTrip?.name}</h1>
+                  <h1 className="text-lg font-bold truncate max-w-[150px]">{currentTrip?.name}</h1>
                 ) : (
                   <div className="flex items-center text-sm font-medium text-emerald-100">
-                    <Icon name="Users" className="w-4 h-4 mr-1" /> {profileName}
+                    <Icon name="Users" className="w-4 h-4 mr-1" /> 
+                    <span className="truncate max-w-[100px]">{profileName}</span>
+                    <button onClick={handleLogout} className="ml-3 p-1 hover:bg-emerald-700 rounded transition-colors" title="Cerrar sesión">
+                      <Icon name="LogOut" className="w-4 h-4 text-emerald-100" />
+                    </button>
                   </div>
                 )}
               </div>
@@ -495,8 +468,57 @@
       );
     }
 
-    // --- Sub-Componentes ---
+    // --- Pantalla de Inicio de Sesión de Google ---
+    function LoginScreen() {
+      const [isLoading, setIsLoading] = useState(false);
 
+      const handleGoogleLogin = async () => {
+        setIsLoading(true);
+        const provider = new GoogleAuthProvider();
+        try {
+          const authObj = getAuth();
+          await signInWithPopup(authObj, provider);
+        } catch (error) {
+          console.error("Error logging in: ", error);
+          alert("Hubo un error al intentar iniciar sesión con Google. Asegúrate de tener las ventanas emergentes permitidas.");
+          setIsLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
+              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">¡Bienvenido a SplitMate!</h1>
+            <p className="text-slate-500 mb-8 font-medium">Inicia sesión con tu cuenta de Google para organizar tus gastos de viaje.</p>
+            
+            <button 
+              onClick={handleGoogleLogin} 
+              disabled={isLoading}
+              className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <span>Cargando...</span>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Iniciar sesión con Google
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // --- Sub-Componentes ---
     function Dashboard({ trips, onSelectTrip, onNewTrip, onJoinTrip }) {
       return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -504,17 +526,11 @@
             <h2 className="text-emerald-800 font-bold text-lg mb-2">¿Viajas con amigos?</h2>
             <p className="text-emerald-600 text-sm mb-4">Crea un viaje o únete a uno existente usando un código de invitación.</p>
             <div className="flex flex-col space-y-3">
-              <button 
-                onClick={onNewTrip}
-                className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all"
-              >
+              <button onClick={onNewTrip} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all">
                 <Icon name="Plus" className="w-5 h-5" />
                 <span>Crear Nuevo Viaje</span>
               </button>
-              <button 
-                onClick={onJoinTrip}
-                className="bg-white text-emerald-700 border-2 border-emerald-200 px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 hover:bg-emerald-50 active:scale-95 transition-all"
-              >
+              <button onClick={onJoinTrip} className="bg-white text-emerald-700 border-2 border-emerald-200 px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 hover:bg-emerald-50 active:scale-95 transition-all">
                 <Icon name="Key" className="w-5 h-5" />
                 <span>Unirse con Código</span>
               </button>
@@ -530,11 +546,7 @@
             ) : (
               <div className="space-y-3">
                 {trips.map(trip => (
-                  <button 
-                    key={trip.id}
-                    onClick={() => onSelectTrip(trip.id)}
-                    className="w-full text-left bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:border-emerald-300 hover:shadow-md transition-all flex items-center justify-between group"
-                  >
+                  <button key={trip.id} onClick={() => onSelectTrip(trip.id)} className="w-full text-left bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:border-emerald-300 hover:shadow-md transition-all flex items-center justify-between group">
                     <div>
                       <h4 className="font-bold text-slate-800 text-lg">{trip.name}</h4>
                       <div className="flex items-center text-slate-500 text-sm mt-1 space-x-3">
@@ -597,11 +609,7 @@
                 <p className="text-slate-300 text-sm font-medium">Gastos Totales del Viaje</p>
                 <h2 className="text-3xl font-bold mt-1">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
               </div>
-              <button 
-                onClick={onDeleteTrip}
-                className="text-slate-400 hover:text-red-400 transition-colors p-2 -mr-2 -mt-2"
-                title="Eliminar Viaje"
-              >
+              <button onClick={onDeleteTrip} className="text-slate-400 hover:text-red-400 transition-colors p-2 -mr-2 -mt-2" title="Eliminar Viaje">
                 <Icon name="Trash2" className="w-5 h-5" />
               </button>
             </div>
@@ -620,9 +628,7 @@
 
             <div className="flex flex-wrap gap-2 mt-4">
               {trip.participants.map(p => (
-                <span key={p} className="bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-full font-medium">
-                  {p}
-                </span>
+                <span key={p} className="bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-full font-medium">{p}</span>
               ))}
             </div>
             {(trip.startDate || trip.endDate || trip.date) && (
@@ -634,26 +640,17 @@
           </div>
 
           <div className="flex bg-slate-200 rounded-xl p-1 mb-6">
-            <button 
-              onClick={() => setActiveTab('expenses')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-            >
+            <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
               Gastos
             </button>
-            <button 
-              onClick={() => setActiveTab('balances')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}
-            >
+            <button onClick={() => setActiveTab('balances')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>
               Liquidar Deudas
             </button>
           </div>
 
           {activeTab === 'expenses' && (
             <div className="space-y-4">
-              <button 
-                onClick={onAddExpense}
-                className="w-full bg-emerald-100 text-emerald-700 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-200 active:scale-95 transition-all"
-              >
+              <button onClick={onAddExpense} className="w-full bg-emerald-100 text-emerald-700 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-200 active:scale-95 transition-all">
                 <Icon name="Receipt" className="w-5 h-5" />
                 <span>Añadir un Gasto</span>
               </button>
@@ -680,9 +677,7 @@
                           {!exp.isSettlement && (
                             <p className="text-xs text-slate-400 mt-1 ml-7 flex flex-wrap gap-1 items-center">
                               <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] uppercase">Dividido con</span> 
-                              {exp.splitAmong.length === trip.participants.length 
-                                ? 'Todos' 
-                                : exp.splitAmong.join(', ')}
+                              {exp.splitAmong.length === trip.participants.length ? 'Todos' : exp.splitAmong.join(', ')}
                             </p>
                           )}
                         </div>
@@ -698,18 +693,10 @@
                             )}
                           </span>
                           <div className="flex space-x-1 mt-2">
-                            <button 
-                              onClick={() => onEditExpense(exp)}
-                              className="text-slate-300 hover:text-blue-500 transition-colors p-1"
-                              title="Editar gasto"
-                            >
+                            <button onClick={() => onEditExpense(exp)} className="text-slate-300 hover:text-blue-500 transition-colors p-1" title="Editar gasto">
                               <Icon name="Pencil" className="w-4 h-4" />
                             </button>
-                            <button 
-                              onClick={() => onDeleteExpense(exp.id)}
-                              className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                              title="Eliminar gasto"
-                            >
+                            <button onClick={() => onDeleteExpense(exp.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Eliminar gasto">
                               <Icon name="Trash2" className="w-4 h-4" />
                             </button>
                           </div>
@@ -753,10 +740,7 @@
                         <div className="font-bold text-emerald-600 text-lg">
                           {currencySymbol}{t.amount.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span>
                         </div>
-                        <button 
-                          onClick={() => onSettleDebt(t)}
-                          className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
-                        >
+                        <button onClick={() => onSettleDebt(t)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors">
                           Marcar Pagado
                         </button>
                       </div>
@@ -774,13 +758,11 @@
       const [name, setName] = useState('');
       const [baseCurrency, setBaseCurrency] = useState('USD');
       const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-      
       const [endDate, setEndDate] = useState(() => {
         const d = new Date();
         d.setDate(d.getDate() + 3);
         return d.toISOString().split('T')[0];
       });
-      
       const [participants, setParticipants] = useState(['', '']);
       const [error, setError] = useState('');
 
@@ -827,25 +809,14 @@
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-slate-600 mb-1.5">Nombre del Viaje</label>
-                <input 
-                  type="text" 
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Ej. Verano en Madrid" 
-                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 placeholder-slate-400"
-                  autoFocus
-                />
+                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Verano en Madrid" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 placeholder-slate-400" autoFocus />
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-slate-600 mb-1.5">Moneda Principal del Viaje</label>
                 <div className="relative">
                   <Icon name="Globe" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <select 
-                    value={baseCurrency}
-                    onChange={e => setBaseCurrency(e.target.value)}
-                    className="w-full border-2 border-slate-200 rounded-xl pl-10 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white appearance-none"
-                  >
+                  <select value={baseCurrency} onChange={e => setBaseCurrency(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl pl-10 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white appearance-none">
                     {Object.entries(CURRENCIES).map(([code, { name }]) => (
                       <option key={code} value={code}>{name}</option>
                     ))}
@@ -856,21 +827,11 @@
               <div className="flex space-x-3">
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-slate-600 mb-1.5">Desde (Opcional)</label>
-                  <input 
-                    type="date" 
-                    value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
-                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
-                  />
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-slate-600 mb-1.5">Hasta (Opcional)</label>
-                  <input 
-                    type="date" 
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
-                  />
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm" />
                 </div>
               </div>
 
@@ -879,13 +840,7 @@
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2 pb-2">
                   {participants.map((p, i) => (
                     <div key={i} className="flex items-center space-x-2">
-                      <input 
-                        type="text" 
-                        value={p}
-                        onChange={e => handleChangeParticipant(i, e.target.value)}
-                        placeholder={`Persona ${i + 1}`} 
-                        className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:outline-none transition-colors"
-                      />
+                      <input type="text" value={p} onChange={e => handleChangeParticipant(i, e.target.value)} placeholder={`Persona ${i + 1}`} className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:outline-none transition-colors" />
                       {participants.length > 2 && (
                         <button type="button" onClick={() => handleRemoveParticipant(i)} className="p-2 text-slate-400 hover:text-red-500">
                           <Icon name="Trash2" className="w-5 h-5" />
@@ -894,22 +849,14 @@
                     </div>
                   ))}
                 </div>
-                <button 
-                  type="button" 
-                  onClick={handleAddParticipant}
-                  className="text-emerald-600 font-bold text-sm mt-3 flex items-center hover:text-emerald-700"
-                >
+                <button type="button" onClick={handleAddParticipant} className="text-emerald-600 font-bold text-sm mt-3 flex items-center hover:text-emerald-700">
                   <Icon name="Plus" className="w-4 h-4 mr-1" /> Añadir otra persona
                 </button>
               </div>
 
               <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-                  Crear Viaje
-                </button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Crear Viaje</button>
               </div>
             </form>
           </div>
@@ -945,7 +892,6 @@
           setExchangeRate(1);
           return;
         }
-        
         setIsFetchingRate(true);
         try {
           const res = await fetch(`https://open.er-api.com/v6/latest/${newCurrency}`);
@@ -1008,14 +954,7 @@
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Para qué fue esto?</label>
-                <input 
-                  type="text" 
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Ej. Cena en pizzería" 
-                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors text-slate-800 placeholder-slate-400 font-medium"
-                  autoFocus
-                />
+                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ej. Cena en pizzería" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors text-slate-800 placeholder-slate-400 font-medium" autoFocus />
               </div>
 
               <div className="flex space-x-3">
@@ -1023,23 +962,12 @@
                   <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Cuánto fue?</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{CURRENCIES[currency]?.symbol || '$'}</span>
-                    <input 
-                      type="text" 
-                      inputMode="decimal"
-                      value={amount}
-                      onChange={e => setAmount(e.target.value)}
-                      placeholder="0.00" 
-                      className="w-full border-2 border-slate-200 rounded-xl pl-8 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800"
-                    />
+                    <input type="text" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full border-2 border-slate-200 rounded-xl pl-8 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800" />
                   </div>
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-slate-600 mb-1.5">Moneda</label>
-                  <select 
-                    value={currency}
-                    onChange={e => handleCurrencyChange(e.target.value)}
-                    className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white"
-                  >
+                  <select value={currency} onChange={e => handleCurrencyChange(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white">
                     {Object.keys(CURRENCIES).map((code) => (
                       <option key={code} value={code}>{code}</option>
                     ))}
@@ -1055,13 +983,7 @@
                       Tasa de cambio (1 {currency} = X {tripCurrency})
                     </label>
                   </div>
-                  <input 
-                    type="text" 
-                    inputMode="decimal"
-                    value={exchangeRate}
-                    onChange={e => setExchangeRate(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none transition-colors text-sm font-medium text-slate-700"
-                  />
+                  <input type="text" inputMode="decimal" value={exchangeRate} onChange={e => setExchangeRate(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none transition-colors text-sm font-medium text-slate-700" />
                   {amount && !isNaN(parseFloat(amount)) && !isNaN(parseFloat(exchangeRate)) && (
                     <p className="text-xs text-emerald-600 font-medium text-right">
                       Total en viaje: {CURRENCIES[tripCurrency]?.symbol}{(parseFloat(amount) * parseFloat(exchangeRate)).toFixed(2)} {tripCurrency}
@@ -1073,11 +995,7 @@
               <div className="flex space-x-3">
                 <div className="flex-[2]">
                   <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quién pagó?</label>
-                  <select 
-                    value={paidBy}
-                    onChange={e => setPaidBy(e.target.value)}
-                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white"
-                  >
+                  <select value={paidBy} onChange={e => setPaidBy(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white">
                     {trip.participants.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
@@ -1085,12 +1003,7 @@
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-slate-600 mb-1.5">Fecha</label>
-                  <input 
-                    type="date" 
-                    value={date}
-                    onChange={e => setDate(e.target.value)}
-                    className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm"
-                  />
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm" />
                 </div>
               </div>
 
@@ -1105,13 +1018,7 @@
                   {trip.participants.map(p => {
                     const isSelected = splitAmong.includes(p);
                     return (
-                      <div 
-                        key={p} 
-                        onClick={() => toggleParticipant(p)}
-                        className={`flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer transition-all ${
-                          isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'
-                        }`}
-                      >
+                      <div key={p} onClick={() => toggleParticipant(p)} className={`flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
                         {isSelected ? <Icon name="CheckSquare" className="w-5 h-5 text-emerald-500" /> : <Icon name="Square" className="w-5 h-5 text-slate-300" />}
                         <span className={`font-medium text-sm ${isSelected ? 'text-emerald-800' : 'text-slate-600'}`}>{p}</span>
                       </div>
@@ -1121,9 +1028,7 @@
               </div>
 
               <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-                  Cancelar
-                </button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
                 <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
                   {expenseToEdit ? 'Guardar Cambios' : 'Guardar Gasto'}
                 </button>
@@ -1144,48 +1049,9 @@
             </div>
             <p className="text-slate-600 mb-6 font-medium">{message}</p>
             <div className="flex space-x-3">
-              <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-                Cancelar
-              </button>
-              <button onClick={onConfirm} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">
-                Eliminar
-              </button>
+              <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+              <button onClick={onConfirm} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">Eliminar</button>
             </div>
-          </div>
-        </div>
-      );
-    }
-
-    function WelcomeScreen({ onSave }) {
-      const [name, setName] = useState('');
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (name.trim()) onSave(name.trim());
-      };
-
-      return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
-              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">¡Bienvenido a SplitMate!</h1>
-            <p className="text-slate-500 mb-8 font-medium">Para empezar a compartir gastos y conectarte con amigos, dinos cómo te llamas.</p>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input 
-                type="text" 
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Tu nombre (Ej. Carlos)" 
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center"
-                autoFocus
-              />
-              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">
-                Empezar a usar la app
-              </button>
-            </form>
           </div>
         </div>
       );
@@ -1209,27 +1075,12 @@
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-slate-600 mb-1.5">Código de Invitación</label>
-                <input 
-                  type="text" 
-                  value={code}
-                  onChange={e => setCode(e.target.value.toUpperCase())}
-                  placeholder="Ej. ABCDEF" 
-                  maxLength={8}
-                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-mono font-bold text-slate-800 text-center text-2xl tracking-widest uppercase"
-                  autoFocus
-                />
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                  Pídele a quien creó el viaje que te comparta el código.
-                </p>
+                <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="Ej. ABCDEF" maxLength={8} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-mono font-bold text-slate-800 text-center text-2xl tracking-widest uppercase" autoFocus />
+                <p className="text-xs text-slate-500 mt-2 text-center">Pídele a quien creó el viaje que te comparta el código.</p>
               </div>
-
               <div className="pt-2 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-                  Unirse
-                </button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Unirse</button>
               </div>
             </form>
           </div>
