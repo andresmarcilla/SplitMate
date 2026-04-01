@@ -199,6 +199,10 @@
       
       const [showNewTripModal, setShowNewTripModal] = useState(false);
       const [showJoinTripModal, setShowJoinTripModal] = useState(false);
+      const [showMapIdentityModal, setShowMapIdentityModal] = useState(false);
+      const [tripToMap, setTripToMap] = useState(null);
+      const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+      
       const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
       const [expenseToEdit, setExpenseToEdit] = useState(null);
       const [confirmDialog, setConfirmDialog] = useState(null);
@@ -209,21 +213,19 @@
           if (currentUser) {
             setUser(currentUser);
             if (currentUser.isAnonymous) {
-              // Si es anónimo, buscamos su nombre en Firestore
               const profileRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'data');
               try {
                 const profileSnap = await getDoc(profileRef);
                 if (profileSnap.exists()) {
                   setProfileName(profileSnap.data().name);
                 } else {
-                  setProfileName(null); // Obliga a mostrar la pantalla para elegir nombre
+                  setProfileName(null);
                 }
               } catch (e) {
                 console.error("Error fetching profile", e);
                 setProfileName(null);
               }
             } else {
-              // Si es Google Auth, tomamos el nombre de su cuenta
               const name = currentUser.displayName || currentUser.email.split('@')[0];
               setProfileName(name);
             }
@@ -301,13 +303,16 @@
           const tripToJoin = trips.find(t => t?.inviteCode === cleanCode);
           
           if (tripToJoin) {
-            if (!tripToJoin.participants.includes(profileName)) {
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
-                participants: arrayUnion(profileName)
-              });
+            if (tripToJoin.participants.includes(profileName)) {
+              // El usuario ya existe exactamente con ese nombre
+              setShowJoinTripModal(false);
+              setCurrentTripId(tripToJoin.id); 
+            } else {
+              // El usuario no está, o está bajo otro nombre. Mostrar modal de mapeo.
+              setTripToMap(tripToJoin);
+              setShowJoinTripModal(false);
+              setShowMapIdentityModal(true);
             }
-            setShowJoinTripModal(false);
-            setCurrentTripId(tripToJoin.id); 
           } else {
             alert(`No encontramos ningún viaje con el código "${cleanCode}". Por favor, verifica que esté bien escrito.`);
           }
@@ -315,6 +320,38 @@
           console.error("Error al unirse al viaje:", error);
           alert("Hubo un error de conexión al intentar unirte. Inténtalo de nuevo.");
         }
+      };
+
+      const handleConfirmIdentityMapping = async (tripToJoin, selectedIdentity) => {
+        if (selectedIdentity === '__NEW__') {
+          // Se añade como participante nuevo
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
+            participants: arrayUnion(profileName)
+          });
+        } else {
+          // Reclamar identidad existente (Reemplazar nombre antiguo por profileName)
+          // 1. Actualizar participantes en el viaje
+          const newParticipants = [...new Set(tripToJoin.participants.map(p => p === selectedIdentity ? profileName : p))];
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
+            participants: newParticipants
+          });
+
+          // 2. Actualizar gastos asociados a esa persona
+          const relatedExpenses = expenses.filter(e => e.tripId === tripToJoin.id && (e.paidBy === selectedIdentity || e.splitAmong.includes(selectedIdentity)));
+          
+          for (const exp of relatedExpenses) {
+            const updates = {};
+            if (exp.paidBy === selectedIdentity) updates.paidBy = profileName;
+            if (exp.splitAmong.includes(selectedIdentity)) {
+              updates.splitAmong = [...new Set(exp.splitAmong.map(p => p === selectedIdentity ? profileName : p))];
+            }
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id), updates);
+          }
+        }
+        
+        setShowMapIdentityModal(false);
+        setTripToMap(null);
+        setCurrentTripId(tripToJoin.id);
       };
 
       const handleSaveExpense = async (expenseData) => {
@@ -368,12 +405,15 @@
 
       const handleDeleteTrip = async (tripId) => {
         if (!user || !tripId) return;
+        
+        // Volver al inicio inmediatamente para evitar que la pantalla quede en blanco
+        setCurrentTripId(null);
+        
         const relatedExpenses = expenses.filter(e => e.tripId === tripId);
         for (const exp of relatedExpenses) {
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
         }
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId));
-        setCurrentTripId(null);
       };
 
       const handleLogout = () => {
@@ -392,12 +432,10 @@
         );
       }
 
-      // Si no hay usuario logueado, mostramos Login con opción Google o Anónimo
       if (!user) {
         return <LoginScreen />;
       }
 
-      // Si es usuario anónimo pero no ha configurado su nombre
       if (user && user.isAnonymous && !profileName) {
          return <WelcomeScreen onSave={handleSaveAnonymousProfile} />;
       }
@@ -406,13 +444,15 @@
       const currentTrip = trips.find(t => t.id === currentTripId);
       const tripExpenses = expenses.filter(e => e.tripId === currentTripId);
 
+      const isTripView = currentTripId && currentTrip;
+
       return (
         <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-20">
           <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl relative overflow-hidden">
             
             <header className="bg-emerald-600 text-white p-4 sticky top-0 z-10 shadow-md">
               <div className="flex items-center justify-between">
-                {currentTripId ? (
+                {isTripView ? (
                   <button onClick={() => setCurrentTripId(null)} className="flex items-center text-emerald-50 hover:text-white transition-colors">
                     <Icon name="ChevronLeft" className="w-6 h-6 mr-1" />
                     <span className="font-medium">Volver</span>
@@ -424,8 +464,8 @@
                   </div>
                 )}
                 
-                {currentTripId ? (
-                  <h1 className="text-lg font-bold truncate max-w-[150px]">{currentTrip?.name}</h1>
+                {isTripView ? (
+                  <h1 className="text-lg font-bold truncate max-w-[150px]">{currentTrip.name}</h1>
                 ) : (
                   <div className="flex items-center text-sm font-medium text-emerald-100">
                     <Icon name="Users" className="w-4 h-4 mr-1" /> 
@@ -439,7 +479,7 @@
             </header>
 
             <main className="p-4">
-              {!currentTripId ? (
+              {!isTripView ? (
                 <Dashboard 
                   trips={myTrips} 
                   onSelectTrip={setCurrentTripId} 
@@ -455,6 +495,7 @@
                   onAddExpense={() => { setExpenseToEdit(null); setShowNewExpenseModal(true); }}
                   onEditExpense={openEditExpense}
                   onDeleteExpense={handleDeleteExpense}
+                  onAddParticipant={() => setShowAddParticipantModal(true)}
                   onDeleteTrip={() => {
                     setConfirmDialog({
                       title: "Eliminar Viaje",
@@ -468,12 +509,12 @@
                       title: isSelf ? "Salir del Viaje" : "Eliminar Participante",
                       message: isSelf ? "¿Estás seguro de que quieres salir de este viaje?" : `¿Estás seguro de que quieres eliminar a ${participantName} del viaje?`,
                       action: async () => {
-                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.id), {
-                          participants: arrayRemove(participantName)
-                        });
                         if (isSelf) {
                           setCurrentTripId(null);
                         }
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.id), {
+                          participants: arrayRemove(participantName)
+                        });
                       }
                     });
                   }}
@@ -493,6 +534,34 @@
               <JoinTripModal 
                 onClose={() => setShowJoinTripModal(false)}
                 onSubmit={handleJoinTrip}
+              />
+            )}
+
+            {showMapIdentityModal && tripToMap && (
+              <MapIdentityModal
+                trip={tripToMap}
+                profileName={profileName}
+                onClose={() => {
+                  setShowMapIdentityModal(false);
+                  setTripToMap(null);
+                }}
+                onConfirm={handleConfirmIdentityMapping}
+              />
+            )}
+
+            {showAddParticipantModal && currentTrip && (
+              <AddParticipantModal
+                onClose={() => setShowAddParticipantModal(false)}
+                onSubmit={async (nameToAdd) => {
+                  if (currentTrip.participants.includes(nameToAdd)) {
+                    alert("Esta persona ya está en el viaje.");
+                    return;
+                  }
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.id), {
+                    participants: arrayUnion(nameToAdd)
+                  });
+                  setShowAddParticipantModal(false);
+                }}
               />
             )}
 
@@ -531,12 +600,14 @@
         const provider = new GoogleAuthProvider();
         try {
           const authObj = getAuth();
-          // Usamos popup, es más confiable si el antivirus no molesta. 
-          // Si el antivirus bloquea, el usuario puede usar el botón de abajo.
           await signInWithPopup(authObj, provider);
         } catch (error) {
           console.error("Error logging in: ", error);
-          alert(`Error de conexión con Google. Tu antivirus o bloqueador de anuncios podría estar interfiriendo.\n\nPor favor, usa la opción "Continuar como Invitado" abajo.`);
+          if (error.code === 'auth/unauthorized-domain') {
+            alert(`¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`);
+          } else {
+            alert(`Error de conexión con Google. Tu antivirus o bloqueador de anuncios podría estar interfiriendo.\n\nPor favor, usa la opción "Continuar como Invitado" abajo.`);
+          }
           setIsLoading(false);
         }
       };
@@ -602,7 +673,6 @@
       );
     }
 
-    // --- Pantalla para pedir el nombre a los invitados ---
     function WelcomeScreen({ onSave }) {
       const [name, setName] = useState('');
 
@@ -677,7 +747,7 @@
       );
     }
 
-    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onSettleDebt }) {
+    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt }) {
       const [activeTab, setActiveTab] = useState('expenses');
 
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
@@ -685,6 +755,7 @@
 
       const baseCurrency = trip.baseCurrency || 'USD';
       const currencySymbol = CURRENCIES[baseCurrency]?.symbol || '$';
+      const isCreatorUser = user.uid === trip.createdBy;
 
       const totalSpent = expenses
         .filter(exp => !exp.isSettlement)
@@ -717,7 +788,7 @@
                 <p className="text-slate-300 text-sm font-medium">Gastos Totales del Viaje</p>
                 <h2 className="text-3xl font-bold mt-1">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
               </div>
-              {user.uid === trip.createdBy && (
+              {isCreatorUser && (
                 <button onClick={onDeleteTrip} className="text-slate-400 hover:text-red-400 transition-colors p-2 -mr-2 -mt-2" title="Eliminar Viaje">
                   <Icon name="Trash2" className="w-5 h-5" />
                 </button>
@@ -736,14 +807,14 @@
               </div>
             )}
 
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap items-center gap-2 mt-4">
               {trip.participants.map(p => {
-                const isCreatorUser = user.uid === trip.createdBy;
                 const isCurrentUser = p === profileName;
+                // El creador puede eliminar a todos menos a sí mismo, un usuario normal solo puede eliminarse a sí mismo
                 const canRemove = (isCreatorUser && !isCurrentUser) || (!isCreatorUser && isCurrentUser);
 
                 return (
-                  <span key={p} className="bg-slate-700 text-slate-200 text-xs pl-2.5 pr-1.5 py-1 rounded-full font-medium flex items-center">
+                  <span key={p} className="bg-slate-700 text-slate-200 text-xs pl-2.5 pr-1.5 py-1 rounded-full font-medium flex items-center shadow-sm">
                     {p}
                     {canRemove && (
                       <button onClick={() => onRemoveParticipant(p)} className="ml-1 text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-slate-600" title={isCurrentUser ? "Salir del viaje" : "Eliminar del viaje"}>
@@ -753,7 +824,14 @@
                   </span>
                 );
               })}
+              
+              {isCreatorUser && (
+                <button onClick={onAddParticipant} className="bg-emerald-100/10 text-emerald-100 hover:bg-emerald-100/20 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-100/20 shadow-sm ml-1">
+                  <Icon name="Plus" className="w-3 h-3 mr-1" /> Añadir
+                </button>
+              )}
             </div>
+            
             {(trip.startDate || trip.endDate || trip.date) && (
               <div className="mt-3 flex items-center text-slate-300 text-xs font-medium">
                 <Icon name="Calendar" className="w-4 h-4 mr-1.5" />
@@ -873,6 +951,80 @@
               )}
             </div>
           )}
+        </div>
+      );
+    }
+
+    // Modal para que el Creador añada personas libremente
+    function AddParticipantModal({ onClose, onSubmit }) {
+      const [name, setName] = useState('');
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim().length > 0) onSubmit(name.trim());
+      };
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-800">Añadir Persona</h2>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">Nombre del participante</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Ana" className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800" autoFocus />
+              </div>
+              <div className="pt-2 flex space-x-3">
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Añadir</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // Modal para Mapear la Identidad al Unirse
+    function MapIdentityModal({ trip, profileName, onClose, onConfirm }) {
+      const [selectedIdentity, setSelectedIdentity] = useState('__NEW__');
+      
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onConfirm(trip, selectedIdentity);
+      };
+      
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200 p-4">
+          <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">¿Quién eres en este viaje?</h2>
+            <p className="text-slate-500 mb-6 text-sm font-medium">Es posible que el organizador ya haya empezado a añadir tus gastos. Si estás en la lista, selecciona tu nombre para reclamar tus gastos, de lo contrario, únete como uno nuevo.</p>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-3">
+                <label className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === '__NEW__' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                  <input type="radio" name="identity" value="__NEW__" checked={selectedIdentity === '__NEW__'} onChange={() => setSelectedIdentity('__NEW__')} className="hidden" />
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === '__NEW__' ? 'border-emerald-500' : 'border-slate-300'}`}>
+                    {selectedIdentity === '__NEW__' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>}
+                  </div>
+                  <span className="font-medium text-slate-800">Añadirme como nuevo:<br/><span className="font-bold text-emerald-700 text-lg">{profileName}</span></span>
+                </label>
+                
+                {trip.participants.map(p => (
+                  <label key={p} className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === p ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="identity" value={p} checked={selectedIdentity === p} onChange={() => setSelectedIdentity(p)} className="hidden" />
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === p ? 'border-emerald-500' : 'border-slate-300'}`}>
+                      {selectedIdentity === p && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>}
+                    </div>
+                    <span className="font-medium text-slate-800">Ya estoy en el grupo como:<br/><span className="font-bold text-slate-600 text-lg">{p}</span></span>
+                  </label>
+                ))}
+              </div>
+              
+              <div className="pt-4 flex space-x-3">
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Confirmar Identidad</button>
+              </div>
+            </form>
+          </div>
         </div>
       );
     }
