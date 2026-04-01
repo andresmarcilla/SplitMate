@@ -21,7 +21,7 @@
   <script type="text/babel" data-type="module">
     // --- Importaciones de Firebase ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
     import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
     const { useState, useEffect, useMemo } = React;
@@ -487,10 +487,10 @@
         const provider = new GoogleAuthProvider();
         try {
           const authObj = getAuth();
-          await signInWithPopup(authObj, provider);
+          await signInWithRedirect(authObj, provider);
         } catch (error) {
           console.error("Error logging in: ", error);
-          alert("Hubo un error al intentar iniciar sesión con Google. Asegúrate de tener las ventanas emergentes permitidas.");
+          alert("Hubo un error al intentar iniciar sesión con Google.");
           setIsLoading(false);
         }
       };
