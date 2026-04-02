@@ -45,6 +45,194 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // --- Sistema de Traducción ---
+    const i18n = {
+      es: {
+        loading: "Cargando SplitMate...",
+        welcome: "¡Bienvenido a SplitMate!",
+        welcomeDesc: "Inicia sesión o entra como invitado para organizar tus gastos de viaje.",
+        loginGoogle: "Iniciar sesión con Google",
+        or: "O también",
+        guest: "Continuar como Invitado",
+        lastStep: "Un último paso",
+        guestDesc: "Como entraste de invitado, dinos cómo te llamas para que tus amigos te reconozcan.",
+        yourName: "Tu nombre (Ej. Carlos)",
+        saveAndEnter: "Guardar e Ingresar",
+        travelWithFriends: "¿Viajas con amigos?",
+        travelWithFriendsDesc: "Crea un viaje o únete a uno existente usando un código de invitación.",
+        createNewTrip: "Crear Nuevo Viaje",
+        joinWithCode: "Unirse con Código",
+        yourTrips: "Tus Viajes",
+        noTrips: "Aún no hay viajes. ¡Toca arriba para empezar!",
+        participants: "participantes",
+        back: "Volver",
+        totalExpenses: "Gastos Totales",
+        perPerson: "/ pers",
+        groupDetails: "Detalles del Grupo",
+        inviteCode: "Código de Invitación",
+        add: "Añadir",
+        expensesTab: "Gastos",
+        debtsTab: "Deudas",
+        infoTab: "Info",
+        addExpense: "Añadir un Gasto",
+        noExpenses: "Aún no hay gastos registrados.",
+        paidBy: "Pagado por",
+        splitWith: "Dividido con",
+        everyone: "Todos",
+        simplifiedDebts: "Deudas Simplificadas",
+        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas, agrupadas por a quién se le debe.",
+        allSettled: "¡Todo saldado!",
+        nobodyOwes: "Nadie debe nada en este momento.",
+        isOwed: "le deben",
+        markPaid: "Marcar Pagado",
+        netContributed: "Dinero aportado (Neto)",
+        netContributedDesc: "Esto indica el dinero real que ha salido del bolsillo de cada persona, teniendo en cuenta las deudas saldadas.",
+        expensesByCategory: "Gastos por Categoría",
+        biggestExpense: "Mayor gasto del viaje",
+        tripName: "Nombre del Viaje",
+        mainCurrency: "Moneda Principal",
+        fromOptional: "Desde (Opcional)",
+        toOptional: "Hasta (Opcional)",
+        whoIsGoing: "¿Quiénes van?",
+        addAnotherPerson: "Añadir otra persona",
+        cancel: "Cancelar",
+        createTrip: "Crear Viaje",
+        editExpense: "Editar Gasto",
+        whatFor: "¿Para qué fue esto?",
+        howMuch: "¿Cuánto fue?",
+        currency: "Moneda",
+        exchangeRate: "Tasa de cambio",
+        totalInTrip: "Total en viaje:",
+        date: "Fecha",
+        splitAmong: "Dividir entre",
+        selectAll: "Seleccionar Todos",
+        saveChanges: "Guardar Cambios",
+        saveExpense: "Guardar Gasto",
+        deleteTrip: "Eliminar Viaje",
+        delete: "Eliminar",
+        joinTrip: "Unirse a un Viaje",
+        askForCode: "Pídele a quien creó el viaje que te comparta el código.",
+        join: "Unirse",
+        whoAreYou: "¿Quién eres en este viaje?",
+        whoAreYouDesc: "Es posible que el organizador ya haya empezado a añadir tus gastos. Si estás en la lista, selecciona tu nombre para reclamar tus gastos, de lo contrario, únete como uno nuevo.",
+        addNewAs: "Añadirme como nuevo:",
+        alreadyInGroupAs: "Ya estoy en el grupo como:",
+        confirmIdentity: "Confirmar Identidad",
+        participantName: "Nombre del participante",
+        logout: "Cerrar sesión",
+        connecting: "Conectando...",
+        errGoogle: "Error de conexión con Google. Tu antivirus o bloqueador de anuncios podría estar interfiriendo.\n\nPor favor, usa la opción 'Continuar como Invitado' abajo.",
+        errGuest: "Error al entrar como invitado.",
+        errNoCode: "No encontramos ningún viaje con el código",
+        errConn: "Hubo un error de conexión al intentar unirte. Inténtalo de nuevo.",
+        codeCopied: "¡Código copiado al portapapeles!",
+        codeNotCopied: "No se pudo copiar el código. Por favor cópialo manualmente:",
+        deleteTripConfirm: "¿Estás seguro de que quieres eliminar el viaje? Esto también borrará todos los gastos asociados. Esta acción no se puede deshacer.",
+        leaveTripConfirm: "¿Estás seguro de que quieres salir de este viaje?",
+        removeParticipantConfirm: "¿Estás seguro de que quieres eliminar a este participante del viaje?",
+        alreadyInTrip: "Esta persona ya está en el viaje.",
+        fillNameAndParticipants: "Por favor ingresa un nombre y al menos 2 participantes.",
+        dateError: "La fecha de inicio no puede ser posterior a la fecha de fin.",
+        fillDescriptionAndAmount: "Por favor ingresa una descripción y cantidad válida.",
+        fillRate: "Por favor ingresa una tasa de cambio válida.",
+        selectOnePerson: "Al menos una persona debe ser seleccionada para dividir.",
+        paymentOf: "Pago de",
+        to: "a"
+      },
+      en: {
+        loading: "Loading SplitMate...",
+        welcome: "Welcome to SplitMate!",
+        welcomeDesc: "Sign in or continue as a guest to organize your travel expenses.",
+        loginGoogle: "Sign in with Google",
+        or: "Or",
+        guest: "Continue as Guest",
+        lastStep: "One last step",
+        guestDesc: "Since you entered as a guest, tell us your name so your friends can recognize you.",
+        yourName: "Your name (e.g. John)",
+        saveAndEnter: "Save and Enter",
+        travelWithFriends: "Traveling with friends?",
+        travelWithFriendsDesc: "Create a trip or join an existing one using an invite code.",
+        createNewTrip: "Create New Trip",
+        joinWithCode: "Join with Code",
+        yourTrips: "Your Trips",
+        noTrips: "No trips yet. Tap above to start!",
+        participants: "participants",
+        back: "Back",
+        totalExpenses: "Total Expenses",
+        perPerson: "/ pers",
+        groupDetails: "Group Details",
+        inviteCode: "Invite Code",
+        add: "Add",
+        expensesTab: "Expenses",
+        debtsTab: "Debts",
+        infoTab: "Info",
+        addExpense: "Add an Expense",
+        noExpenses: "No expenses recorded yet.",
+        paidBy: "Paid by",
+        splitWith: "Split with",
+        everyone: "Everyone",
+        simplifiedDebts: "Simplified Debts",
+        debtsDesc: "We've calculated the minimum number of transfers needed to settle all debts, grouped by who is owed.",
+        allSettled: "All settled!",
+        nobodyOwes: "Nobody owes anything right now.",
+        isOwed: "is owed",
+        markPaid: "Mark Paid",
+        netContributed: "Net Contributed",
+        netContributedDesc: "This indicates the actual money that has left each person's pocket, taking into account settled debts.",
+        expensesByCategory: "Expenses by Category",
+        biggestExpense: "Biggest trip expense",
+        tripName: "Trip Name",
+        mainCurrency: "Main Currency",
+        fromOptional: "From (Optional)",
+        toOptional: "To (Optional)",
+        whoIsGoing: "Who is going?",
+        addAnotherPerson: "Add another person",
+        cancel: "Cancel",
+        createTrip: "Create Trip",
+        editExpense: "Edit Expense",
+        whatFor: "What was this for?",
+        howMuch: "How much?",
+        currency: "Currency",
+        exchangeRate: "Exchange Rate",
+        totalInTrip: "Total in trip:",
+        date: "Date",
+        splitAmong: "Split among",
+        selectAll: "Select All",
+        saveChanges: "Save Changes",
+        saveExpense: "Save Expense",
+        deleteTrip: "Delete Trip",
+        delete: "Delete",
+        joinTrip: "Join a Trip",
+        askForCode: "Ask the trip creator to share the code with you.",
+        join: "Join",
+        whoAreYou: "Who are you in this trip?",
+        whoAreYouDesc: "The organizer may have already started adding your expenses. If you're on the list, select your name to claim your expenses, otherwise join as a new person.",
+        addNewAs: "Add me as new:",
+        alreadyInGroupAs: "I'm already in the group as:",
+        confirmIdentity: "Confirm Identity",
+        participantName: "Participant name",
+        logout: "Logout",
+        connecting: "Connecting...",
+        errGoogle: "Connection error with Google. Your antivirus or adblocker might be interfering.\n\nPlease use the 'Continue as Guest' option below.",
+        errGuest: "Error entering as guest.",
+        errNoCode: "We didn't find any trip with the code",
+        errConn: "There was a connection error when trying to join.",
+        codeCopied: "Code copied to clipboard!",
+        codeNotCopied: "Could not copy the code. Please copy it manually:",
+        deleteTripConfirm: "Are you sure you want to delete the trip? This will also delete all associated expenses. This action cannot be undone.",
+        leaveTripConfirm: "Are you sure you want to leave this trip?",
+        removeParticipantConfirm: "Are you sure you want to remove this participant from the trip?",
+        alreadyInTrip: "This person is already in the trip.",
+        fillNameAndParticipants: "Please enter a name and at least 2 participants.",
+        dateError: "The start date cannot be later than the end date.",
+        fillDescriptionAndAmount: "Please enter a valid description and amount.",
+        fillRate: "Please enter a valid exchange rate.",
+        selectOnePerson: "At least one person must be selected to split.",
+        paymentOf: "Payment from",
+        to: "to"
+      }
+    };
+
     // --- Sistema de Iconos Integrado ---
     const Icon = ({ name, className }) => {
       const paths = {
@@ -71,7 +259,8 @@
         X: <><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>,
         UserCircle: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></>,
         PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
-        TrendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>
+        TrendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
+        Share2: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></>
       };
       return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -80,17 +269,17 @@
       );
     };
 
-    // --- Constantes de Monedas ---
+    // --- Constantes de Monedas Reorganizadas ---
     const CURRENCIES = {
-      USD: { symbol: '$', name: 'US Dollar (USD)' },
       EUR: { symbol: '€', name: 'Euro (EUR)' },
-      MXN: { symbol: '$', name: 'Peso Mexicano (MXN)' },
+      USD: { symbol: '$', name: 'US Dollar (USD)' },
       ARS: { symbol: '$', name: 'Peso Argentino (ARS)' },
+      MXN: { symbol: '$', name: 'Peso Mexicano (MXN)' },
       COP: { symbol: '$', name: 'Peso Colombiano (COP)' },
       CLP: { symbol: '$', name: 'Peso Chileno (CLP)' },
       PEN: { symbol: 'S/', name: 'Sol Peruano (PEN)' },
-      GBP: { symbol: '£', name: 'British Pound (GBP)' },
       BRL: { symbol: 'R$', name: 'Real Brasileño (BRL)' },
+      GBP: { symbol: '£', name: 'British Pound (GBP)' },
       JPY: { symbol: '¥', name: 'Yen Japonés (JPY)' },
     };
 
@@ -166,30 +355,30 @@
     function getExpenseIcon(description, isSettlement) {
       if (isSettlement) return '💸';
       const lowerDesc = description.toLowerCase();
-      if (/(comida|cena|almuerzo|desayuno|restaurante|bar|cerveza|pizza|sushi|burger|mcdonalds|super|compra)/i.test(lowerDesc)) return '🍔';
-      if (/(taxi|uber|cabify|bus|autobus|tren|vuelo|avion|gasolina|peaje|coche|transporte|metro)/i.test(lowerDesc)) return '🚕';
-      if (/(hotel|airbnb|hostal|alojamiento|casa)/i.test(lowerDesc)) return '🏨';
-      if (/(cine|museo|entrada|ticket|tour|excursion|fiesta|discoteca|copas)/i.test(lowerDesc)) return '🎟️';
+      if (/(comida|cena|almuerzo|desayuno|restaurante|bar|cerveza|pizza|sushi|burger|mcdonalds|super|compra|food|dinner|lunch|breakfast|restaurant|beer)/i.test(lowerDesc)) return '🍔';
+      if (/(taxi|uber|cabify|bus|autobus|tren|vuelo|avion|gasolina|peaje|coche|transporte|metro|train|flight|plane|gas|car|transport)/i.test(lowerDesc)) return '🚕';
+      if (/(hotel|airbnb|hostal|alojamiento|casa|accommodation|house)/i.test(lowerDesc)) return '🏨';
+      if (/(cine|museo|entrada|ticket|tour|excursion|fiesta|discoteca|copas|cinema|museum|party|drinks)/i.test(lowerDesc)) return '🎟️';
       return '🧾';
     }
 
-    function formatDateRange(start, end) {
+    function formatDateRange(start, end, lang) {
       if (!start && !end) return null;
       const format = (dStr) => {
         if(!dStr) return '?';
         const [y, m, d] = dStr.split('-');
-        return `${d}/${m}/${y.slice(2)}`; 
+        return lang === 'es' ? `${d}/${m}/${y.slice(2)}` : `${m}/${d}/${y.slice(2)}`; 
       };
-      if (start && end) return `${format(start)} al ${format(end)}`;
-      if (start) return `Desde ${format(start)}`;
-      if (end) return `Hasta ${format(end)}`;
+      if (start && end) return lang === 'es' ? `${format(start)} al ${format(end)}` : `${format(start)} to ${format(end)}`;
+      if (start) return lang === 'es' ? `Desde ${format(start)}` : `From ${format(start)}`;
+      if (end) return lang === 'es' ? `Hasta ${format(end)}` : `Until ${format(end)}`;
       return null;
     }
 
-    function formatDate(dStr) {
+    function formatDate(dStr, lang) {
       if (!dStr) return '';
       const [y, m, d] = dStr.split('-');
-      return `${d}/${m}/${y.slice(2)}`;
+      return lang === 'es' ? `${d}/${m}/${y.slice(2)}` : `${m}/${d}/${y.slice(2)}`;
     }
 
     // --- Componente Principal ---
@@ -210,6 +399,11 @@
       const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
       const [expenseToEdit, setExpenseToEdit] = useState(null);
       const [confirmDialog, setConfirmDialog] = useState(null);
+
+      // --- Idioma ---
+      const [lang, setLang] = useState(() => localStorage.getItem('splitmate_lang') || 'es');
+      useEffect(() => { localStorage.setItem('splitmate_lang', lang); }, [lang]);
+      const t = i18n[lang];
 
       // --- Autenticación ---
       useEffect(() => {
@@ -304,7 +498,7 @@
         if (!user || !profileName) return;
         try {
           const cleanCode = code.trim().toUpperCase();
-          const tripToJoin = trips.find(t => t?.inviteCode === cleanCode);
+          const tripToJoin = trips.find(trip => trip?.inviteCode === cleanCode);
           
           if (tripToJoin) {
             if (tripToJoin.participants.includes(profileName)) {
@@ -316,11 +510,11 @@
               setShowMapIdentityModal(true);
             }
           } else {
-            alert(`No encontramos ningún viaje con el código "${cleanCode}". Por favor, verifica que esté bien escrito.`);
+            alert(`${t.errNoCode} "${cleanCode}".`);
           }
         } catch (error) {
           console.error("Error al unirse al viaje:", error);
-          alert("Hubo un error de conexión al intentar unirte. Inténtalo de nuevo.");
+          alert(t.errConn);
         }
       };
 
@@ -372,11 +566,11 @@
 
       const handleSettleDebt = async (transfer) => {
         if (!user || !currentTripId) return;
-        const tripToUpdate = trips.find(t => t.id === currentTripId);
+        const tripToUpdate = trips.find(trip => trip.id === currentTripId);
         const baseCurrency = tripToUpdate?.baseCurrency || 'USD';
 
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
-          description: `Pago de ${transfer.from} a ${transfer.to}`,
+          description: `${t.paymentOf} ${transfer.from} ${t.to} ${transfer.to}`,
           amount: transfer.amount,
           convertedAmount: transfer.amount,
           currency: baseCurrency,
@@ -421,22 +615,22 @@
           <div className="min-h-screen bg-slate-50 flex items-center justify-center">
             <div className="animate-pulse flex flex-col items-center">
               <Icon name="Plane" className="w-12 h-12 text-emerald-500 mb-4" />
-              <p className="text-slate-500 font-medium">Cargando SplitMate...</p>
+              <p className="text-slate-500 font-medium">{t.loading}</p>
             </div>
           </div>
         );
       }
 
       if (!user) {
-        return <LoginScreen />;
+        return <LoginScreen t={t} lang={lang} setLang={setLang} />;
       }
 
       if (user && user.isAnonymous && !profileName) {
-         return <WelcomeScreen onSave={handleSaveAnonymousProfile} />;
+         return <WelcomeScreen onSave={handleSaveAnonymousProfile} t={t} lang={lang} setLang={setLang} />;
       }
 
-      const myTrips = trips.filter(t => t.participants.includes(profileName));
-      const currentTrip = trips.find(t => t.id === currentTripId);
+      const myTrips = trips.filter(trip => trip.participants.includes(profileName));
+      const currentTrip = trips.find(trip => trip.id === currentTripId);
       const tripExpenses = expenses.filter(e => e.tripId === currentTripId);
       const isTripView = currentTripId && currentTrip;
 
@@ -449,7 +643,7 @@
                 {isTripView ? (
                   <button onClick={() => setCurrentTripId(null)} className="flex items-center text-emerald-50 hover:text-white transition-colors">
                     <Icon name="ChevronLeft" className="w-6 h-6 mr-1" />
-                    <span className="font-medium">Volver</span>
+                    <span className="font-medium">{t.back}</span>
                   </button>
                 ) : (
                   <div className="flex items-center space-x-2">
@@ -464,7 +658,10 @@
                   <div className="flex items-center text-sm font-medium text-emerald-100">
                     <Icon name="Users" className="w-4 h-4 mr-1" /> 
                     <span className="truncate max-w-[100px]">{profileName}</span>
-                    <button onClick={handleLogout} className="ml-3 p-1 hover:bg-emerald-700 rounded transition-colors" title="Cerrar sesión">
+                    <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="ml-3 p-1 font-bold text-xs bg-emerald-700/50 hover:bg-emerald-700 rounded transition-colors" title="Cambiar idioma">
+                      {lang === 'es' ? 'EN' : 'ES'}
+                    </button>
+                    <button onClick={handleLogout} className="ml-2 p-1 hover:bg-emerald-700 rounded transition-colors" title={t.logout}>
                       <Icon name="LogOut" className="w-4 h-4 text-emerald-100" />
                     </button>
                   </div>
@@ -480,6 +677,8 @@
                     onSelectTrip={setCurrentTripId} 
                     onNewTrip={() => setShowNewTripModal(true)} 
                     onJoinTrip={() => setShowJoinTripModal(true)}
+                    t={t}
+                    lang={lang}
                   />
                 </div>
               ) : (
@@ -488,22 +687,24 @@
                   expenses={tripExpenses} 
                   user={user}
                   profileName={profileName}
+                  t={t}
+                  lang={lang}
                   onAddExpense={() => { setExpenseToEdit(null); setShowNewExpenseModal(true); }}
                   onEditExpense={openEditExpense}
                   onDeleteExpense={handleDeleteExpense}
                   onAddParticipant={() => setShowAddParticipantModal(true)}
                   onDeleteTrip={() => {
                     setConfirmDialog({
-                      title: "Eliminar Viaje",
-                      message: `¿Estás seguro de que quieres eliminar "${currentTrip.name}"? Esto también borrará todos los gastos asociados. Esta acción no se puede deshacer.`,
+                      title: t.deleteTrip,
+                      message: t.deleteTripConfirm,
                       action: () => handleDeleteTrip(currentTrip.id)
                     });
                   }}
                   onRemoveParticipant={(participantName) => {
                     const isSelf = participantName === profileName;
                     setConfirmDialog({
-                      title: isSelf ? "Salir del Viaje" : "Eliminar Participante",
-                      message: isSelf ? "¿Estás seguro de que quieres salir de este viaje?" : `¿Estás seguro de que quieres eliminar a ${participantName} del viaje?`,
+                      title: isSelf ? t.leaveTripConfirm : t.removeParticipantConfirm,
+                      message: isSelf ? t.leaveTripConfirm : t.removeParticipantConfirm,
                       action: async () => {
                         if (isSelf) {
                           setCurrentTripId(null);
@@ -521,6 +722,7 @@
 
             {showNewTripModal && (
               <NewTripModal 
+                t={t}
                 onClose={() => setShowNewTripModal(false)} 
                 onSubmit={handleCreateTrip} 
               />
@@ -528,6 +730,7 @@
 
             {showJoinTripModal && (
               <JoinTripModal 
+                t={t}
                 onClose={() => setShowJoinTripModal(false)}
                 onSubmit={handleJoinTrip}
               />
@@ -537,6 +740,7 @@
               <MapIdentityModal
                 trip={tripToMap}
                 profileName={profileName}
+                t={t}
                 onClose={() => {
                   setShowMapIdentityModal(false);
                   setTripToMap(null);
@@ -547,10 +751,11 @@
 
             {showAddParticipantModal && currentTrip && (
               <AddParticipantModal
+                t={t}
                 onClose={() => setShowAddParticipantModal(false)}
                 onSubmit={async (nameToAdd) => {
                   if (currentTrip.participants.includes(nameToAdd)) {
-                    alert("Esta persona ya está en el viaje.");
+                    alert(t.alreadyInTrip);
                     return;
                   }
                   await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.id), {
@@ -565,6 +770,7 @@
               <NewExpenseModal 
                 trip={currentTrip}
                 expenseToEdit={expenseToEdit}
+                t={t}
                 onClose={() => { setShowNewExpenseModal(false); setExpenseToEdit(null); }} 
                 onSubmit={handleSaveExpense} 
               />
@@ -574,6 +780,7 @@
               <ConfirmModal 
                 title={confirmDialog.title}
                 message={confirmDialog.message}
+                t={t}
                 onCancel={() => setConfirmDialog(null)}
                 onConfirm={async () => {
                   await confirmDialog.action();
@@ -587,8 +794,8 @@
       );
     }
 
-    // --- Pantalla de Inicio de Sesión de Google o Invitado ---
-    function LoginScreen() {
+    // --- Pantalla de Inicio de Sesión ---
+    function LoginScreen({ t, lang, setLang }) {
       const [isLoading, setIsLoading] = useState(false);
 
       const handleGoogleLogin = async () => {
@@ -600,9 +807,12 @@
         } catch (error) {
           console.error("Error logging in: ", error);
           if (error.code === 'auth/unauthorized-domain') {
-            alert(`¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`);
+            const errStr = lang === 'es' 
+              ? `¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`
+              : `ATTENTION! Unauthorized domain in Firebase.\n\nTo fix this:\n1. Go to Firebase Console.\n2. Go to Authentication -> Settings -> Authorized domains.\n3. Add this exact domain:\n\n${window.location.hostname}\n\nMeanwhile, you can continue as Guest.`;
+            alert(errStr);
           } else {
-            alert(`Error de conexión con Google. Tu antivirus o bloqueador de anuncios podría estar interfiriendo.\n\nPor favor, usa la opción "Continuar como Invitado" abajo.`);
+            alert(t.errGoogle);
           }
           setIsLoading(false);
         }
@@ -615,23 +825,28 @@
           await signInAnonymously(authObj);
         } catch (error) {
           console.error("Error logging in as guest: ", error);
-          alert("Error al entrar como invitado.");
+          alert(t.errGuest);
           setIsLoading(false);
         }
       };
 
       return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
+          <div className="absolute top-4 right-4">
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
           <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
             <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
               <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">¡Bienvenido a SplitMate!</h1>
-            <p className="text-slate-500 mb-8 font-medium">Inicia sesión o entra como invitado para organizar tus gastos de viaje.</p>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.welcome}</h1>
+            <p className="text-slate-500 mb-8 font-medium">{t.welcomeDesc}</p>
             
             <div className="space-y-4">
               <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
-                {isLoading ? <span>Conectando...</span> : (
+                {isLoading ? <span>{t.connecting}</span> : (
                   <>
                     <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -639,18 +854,18 @@
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
-                    Iniciar sesión con Google
+                    {t.loginGoogle}
                   </>
                 )}
               </button>
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">O también</span></div>
+                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">{t.or}</span></div>
               </div>
 
               <button onClick={handleAnonymousLogin} disabled={isLoading} className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
-                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> Continuar como Invitado
+                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> {t.guest}
               </button>
             </div>
           </div>
@@ -658,20 +873,25 @@
       );
     }
 
-    function WelcomeScreen({ onSave }) {
+    function WelcomeScreen({ onSave, t, lang, setLang }) {
       const [name, setName] = useState('');
       const handleSubmit = (e) => {
         e.preventDefault();
         if (name.trim()) onSave(name.trim());
       };
       return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
+          <div className="absolute top-4 right-4">
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
           <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">Un último paso</h1>
-            <p className="text-slate-500 mb-8 font-medium">Como entraste de invitado, dinos cómo te llamas para que tus amigos te reconozcan.</p>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.lastStep}</h1>
+            <p className="text-slate-500 mb-8 font-medium">{t.guestDesc}</p>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre (Ej. Carlos)" className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
-              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">Guardar e Ingresar</button>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.yourName} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
+              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">{t.saveAndEnter}</button>
             </form>
           </div>
         </div>
@@ -679,29 +899,29 @@
     }
 
     // --- Sub-Componentes ---
-    function Dashboard({ trips, onSelectTrip, onNewTrip, onJoinTrip }) {
+    function Dashboard({ trips, onSelectTrip, onNewTrip, onJoinTrip, t, lang }) {
       return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 text-center">
-            <h2 className="text-emerald-800 font-bold text-lg mb-2">¿Viajas con amigos?</h2>
-            <p className="text-emerald-600 text-sm mb-4">Crea un viaje o únete a uno existente usando un código de invitación.</p>
+            <h2 className="text-emerald-800 font-bold text-lg mb-2">{t.travelWithFriends}</h2>
+            <p className="text-emerald-600 text-sm mb-4">{t.travelWithFriendsDesc}</p>
             <div className="flex flex-col space-y-3">
               <button onClick={onNewTrip} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all">
                 <Icon name="Plus" className="w-5 h-5" />
-                <span>Crear Nuevo Viaje</span>
+                <span>{t.createNewTrip}</span>
               </button>
               <button onClick={onJoinTrip} className="bg-white text-emerald-700 border-2 border-emerald-200 px-6 py-3 rounded-xl font-semibold w-full flex items-center justify-center space-x-2 hover:bg-emerald-50 active:scale-95 transition-all">
                 <Icon name="Key" className="w-5 h-5" />
-                <span>Unirse con Código</span>
+                <span>{t.joinWithCode}</span>
               </button>
             </div>
           </div>
 
           <div>
-            <h3 className="text-slate-500 font-bold uppercase tracking-wider text-xs mb-3 ml-1">Tus Viajes</h3>
+            <h3 className="text-slate-500 font-bold uppercase tracking-wider text-xs mb-3 ml-1">{t.yourTrips}</h3>
             {trips.length === 0 ? (
               <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-slate-400">Aún no hay viajes. ¡Toca arriba para empezar!</p>
+                <p className="text-slate-400">{t.noTrips}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -710,11 +930,11 @@
                     <div>
                       <h4 className="font-bold text-slate-800 text-lg">{trip.name}</h4>
                       <div className="flex items-center text-slate-500 text-sm mt-1 space-x-3">
-                        <span className="flex items-center"><Icon name="Users" className="w-4 h-4 mr-1.5" />{trip.participants.length} participantes</span>
+                        <span className="flex items-center"><Icon name="Users" className="w-4 h-4 mr-1.5" />{trip.participants.length} {t.participants}</span>
                         {(trip.startDate || trip.endDate || trip.date) && (
                           <span className="text-xs font-medium bg-slate-100 px-2 py-0.5 rounded-md flex items-center">
                             <Icon name="Calendar" className="w-3 h-3 mr-1 text-slate-400" />
-                            {formatDateRange(trip.startDate || trip.date, trip.endDate)}
+                            {formatDateRange(trip.startDate || trip.date, trip.endDate, lang)}
                           </span>
                         )}
                       </div>
@@ -729,7 +949,7 @@
       );
     }
 
-    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt }) {
+    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt, t, lang }) {
       const [activeTab, setActiveTab] = useState('expenses');
       const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
       const [expandedCreditors, setExpandedCreditors] = useState({});
@@ -737,15 +957,12 @@
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
       const transfers = useMemo(() => simplifyDebts(balances), [balances]);
 
-      // --- Agrupar transferencias por Acreedor ---
       const groupedTransfers = useMemo(() => {
         const groups = {};
-        transfers.forEach(t => {
-          if (!groups[t.to]) {
-            groups[t.to] = { total: 0, debts: [] };
-          }
-          groups[t.to].total += t.amount;
-          groups[t.to].debts.push(t);
+        transfers.forEach(tf => {
+          if (!groups[tf.to]) { groups[tf.to] = { total: 0, debts: [] }; }
+          groups[tf.to].total += tf.amount;
+          groups[tf.to].debts.push(tf);
         });
         return groups;
       }, [transfers]);
@@ -758,19 +975,26 @@
       const currencySymbol = CURRENCIES[baseCurrency]?.symbol || '$';
       const isCreatorUser = user.uid === trip.createdBy;
 
-      // --- Cálculos para el nuevo Resumen ---
-      const totalSpentPerPerson = {};
-      trip.participants.forEach(p => totalSpentPerPerson[p] = 0);
+      const totalContributedPerPerson = {};
+      trip.participants.forEach(p => totalContributedPerPerson[p] = 0);
       const categoryTotals = {};
       let biggestExpense = null;
+      let totalSpent = 0;
 
-      const totalSpent = expenses
-        .filter(exp => !exp.isSettlement)
-        .reduce((sum, exp) => {
-          const amount = exp.convertedAmount !== undefined ? Number(exp.convertedAmount) : Number(exp.amount);
-          
-          if (totalSpentPerPerson[exp.paidBy] !== undefined) {
-             totalSpentPerPerson[exp.paidBy] += amount;
+      expenses.forEach(exp => {
+        const amount = exp.convertedAmount !== undefined ? Number(exp.convertedAmount) : Number(exp.amount);
+        
+        if (exp.isSettlement) {
+          if (totalContributedPerPerson[exp.paidBy] !== undefined) {
+             totalContributedPerPerson[exp.paidBy] += amount;
+          }
+          const receiver = exp.splitAmong[0];
+          if (receiver && totalContributedPerPerson[receiver] !== undefined) {
+             totalContributedPerPerson[receiver] -= amount;
+          }
+        } else {
+          if (totalContributedPerPerson[exp.paidBy] !== undefined) {
+             totalContributedPerPerson[exp.paidBy] += amount;
           }
           
           const icon = getExpenseIcon(exp.description, false);
@@ -779,9 +1003,11 @@
           if (!biggestExpense || amount > (biggestExpense.convertedAmount || biggestExpense.amount)) {
              biggestExpense = exp;
           }
+          totalSpent += amount;
+        }
+      });
 
-          return sum + amount;
-        }, 0);
+      const averageSpent = trip.participants.length > 0 ? totalSpent / trip.participants.length : 0;
 
       const copyCode = () => {
         const textArea = document.createElement("textarea");
@@ -792,12 +1018,19 @@
         textArea.select();
         try {
           document.execCommand('copy');
-          alert(`¡Código ${trip.inviteCode} copiado al portapapeles! Dáselo a tus amigos.`);
+          alert(t.codeCopied);
         } catch(e) {
-          alert(`No se pudo copiar el código. Por favor cópialo manualmente: ${trip.inviteCode}`);
+          alert(`${t.codeNotCopied} ${trip.inviteCode}`);
         } finally {
           document.body.removeChild(textArea);
         }
+      };
+
+      const shareWhatsApp = () => {
+        const text = lang === 'es' 
+          ? `¡Únete a mi viaje "${trip.name}" en SplitMate! Usa el código: ${trip.inviteCode}\n\nIngresa aquí: ${window.location.href}`
+          : `Join my trip "${trip.name}" on SplitMate! Use the code: ${trip.inviteCode}\n\nEnter here: ${window.location.href}`;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
       };
 
       return (
@@ -816,8 +1049,11 @@
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-slate-300 text-xs font-medium uppercase tracking-wider">Gastos Totales</p>
-                  <h2 className="text-2xl font-bold mt-0.5">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
+                  <p className="text-slate-300 text-xs font-medium uppercase tracking-wider">{t.totalExpenses}</p>
+                  <div className="flex items-end space-x-2 mt-0.5">
+                    <h2 className="text-2xl font-bold leading-none">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
+                    <span className="text-xs text-slate-400 mb-0.5 font-medium px-2 py-0.5 bg-slate-700/50 rounded-lg">~{currencySymbol}{averageSpent.toFixed(2)} {t.perPerson}</span>
+                  </div>
                 </div>
                 <div className="bg-slate-700 p-1.5 rounded-full flex items-center justify-center">
                   <Icon name={isOverviewExpanded ? "ChevronUp" : "ChevronDown"} className="w-5 h-5 text-slate-300" />
@@ -828,9 +1064,9 @@
                 <div className="mt-4 pt-4 border-t border-slate-600 animate-in fade-in duration-300 cursor-default">
                   
                   <div className="flex justify-between items-center mb-4">
-                    <p className="text-sm font-medium text-slate-300">Detalles del Grupo</p>
+                    <p className="text-sm font-medium text-slate-300">{t.groupDetails}</p>
                     {isCreatorUser && (
-                      <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title="Eliminar Viaje">
+                      <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t.deleteTrip}>
                         <Icon name="Trash2" className="w-5 h-5" />
                       </button>
                     )}
@@ -839,12 +1075,17 @@
                   {trip.inviteCode && (
                     <div className="bg-slate-700/50 rounded-xl p-3 border border-slate-600 flex items-center justify-between mb-4">
                       <div>
-                        <p className="text-xs text-slate-300 font-medium">Código de Invitación</p>
+                        <p className="text-xs text-slate-300 font-medium">{t.inviteCode}</p>
                         <p className="text-lg font-mono font-bold tracking-widest text-emerald-400">{trip.inviteCode}</p>
                       </div>
-                      <button onClick={copyCode} className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" title="Copiar código">
-                        <Icon name="Copy" className="w-4 h-4 text-white" />
-                      </button>
+                      <div className="flex space-x-2">
+                        <button onClick={copyCode} className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" title="Copiar">
+                          <Icon name="Copy" className="w-4 h-4 text-white" />
+                        </button>
+                        <button onClick={shareWhatsApp} className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors" title="WhatsApp">
+                          <Icon name="Share2" className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -856,7 +1097,7 @@
                         <span key={p} className="bg-slate-700 text-slate-200 text-xs pl-2.5 pr-1.5 py-1 rounded-full font-medium flex items-center shadow-sm">
                           {p}
                           {canRemove && (
-                            <button onClick={() => onRemoveParticipant(p)} className="ml-1 text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-slate-600" title={isCurrentUser ? "Salir del viaje" : "Eliminar del viaje"}>
+                            <button onClick={() => onRemoveParticipant(p)} className="ml-1 text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-slate-600" title={t.delete}>
                               <Icon name="X" className="w-3 h-3" />
                             </button>
                           )}
@@ -866,7 +1107,7 @@
                     
                     {isCreatorUser && (
                       <button onClick={onAddParticipant} className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-500/30 shadow-sm ml-1">
-                        <Icon name="Plus" className="w-3 h-3 mr-1" /> Añadir
+                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.add}
                       </button>
                     )}
                   </div>
@@ -874,7 +1115,7 @@
                   {(trip.startDate || trip.endDate || trip.date) && (
                     <div className="mt-4 flex items-center text-slate-300 text-xs font-medium">
                       <Icon name="Calendar" className="w-4 h-4 mr-1.5" />
-                      {formatDateRange(trip.startDate || trip.date, trip.endDate)}
+                      {formatDateRange(trip.startDate || trip.date, trip.endDate, lang)}
                     </div>
                   )}
                 </div>
@@ -884,20 +1125,20 @@
             {/* Pestañas de Navegación */}
             <div className="flex bg-slate-200/80 p-1 rounded-xl mb-3 border border-slate-200">
               <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
-                <span className="hidden sm:inline mr-1">🧾</span> Gastos
+                <span className="hidden sm:inline mr-1">🧾</span> {t.expensesTab}
               </button>
               <button onClick={() => setActiveTab('balances')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>
-                <span className="hidden sm:inline mr-1">💸</span> Deudas
+                <span className="hidden sm:inline mr-1">💸</span> {t.debtsTab}
               </button>
               <button onClick={() => setActiveTab('summary')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'summary' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
-                <span className="hidden sm:inline mr-1">📊</span> Info
+                <span className="hidden sm:inline mr-1">📊</span> {t.infoTab}
               </button>
             </div>
 
             {/* Botón Añadir Gasto - Siempre Visible */}
             <button onClick={onAddExpense} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-200">
               <Icon name="Plus" className="w-5 h-5" />
-              <span>Añadir un Gasto</span>
+              <span>{t.addExpense}</span>
             </button>
           </div>
 
@@ -907,7 +1148,7 @@
               <div className="space-y-3">
                 {expenses.length === 0 ? (
                   <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl">
-                    <p className="text-slate-400">Aún no hay gastos registrados.</p>
+                    <p className="text-slate-400">{t.noExpenses}</p>
                   </div>
                 ) : (
                   expenses.map(exp => {
@@ -920,13 +1161,13 @@
                             <h4 className={`font-bold ${exp.isSettlement ? 'text-emerald-800' : 'text-slate-800'}`}>{exp.description}</h4>
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5 ml-7">
-                            Pagado por <span className="font-bold text-slate-700">{exp.paidBy}</span>
-                            {exp.date && <span className="ml-1.5 font-medium text-slate-400">• {formatDate(exp.date)}</span>}
+                            {t.paidBy} <span className="font-bold text-slate-700">{exp.paidBy}</span>
+                            {exp.date && <span className="ml-1.5 font-medium text-slate-400">• {formatDate(exp.date, lang)}</span>}
                           </p>
                           {!exp.isSettlement && (
                             <p className="text-xs text-slate-400 mt-1 ml-7 flex flex-wrap gap-1 items-center">
-                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] uppercase">Dividido con</span> 
-                              {exp.splitAmong.length === trip.participants.length ? 'Todos' : exp.splitAmong.join(', ')}
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] uppercase">{t.splitWith}</span> 
+                              {exp.splitAmong.length === trip.participants.length ? t.everyone : exp.splitAmong.join(', ')}
                             </p>
                           )}
                         </div>
@@ -942,10 +1183,10 @@
                             )}
                           </span>
                           <div className="flex space-x-1 mt-2">
-                            <button onClick={() => onEditExpense(exp)} className="text-slate-300 hover:text-blue-500 transition-colors p-1" title="Editar gasto">
+                            <button onClick={() => onEditExpense(exp)} className="text-slate-300 hover:text-blue-500 transition-colors p-1" title={t.editExpense}>
                               <Icon name="Pencil" className="w-4 h-4" />
                             </button>
-                            <button onClick={() => onDeleteExpense(exp.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Eliminar gasto">
+                            <button onClick={() => onDeleteExpense(exp.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title={t.delete}>
                               <Icon name="Trash2" className="w-4 h-4" />
                             </button>
                           </div>
@@ -961,9 +1202,9 @@
               <div className="space-y-4">
                 <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4">
                   <h3 className="font-bold text-emerald-800 flex items-center">
-                    <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> Deudas Simplificadas
+                    <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> {t.simplifiedDebts}
                   </h3>
-                  <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas, agrupadas por a quién se le debe.</p>
+                  <p className="text-sm text-emerald-600 mt-1">{t.debtsDesc}</p>
                 </div>
 
                 {Object.keys(groupedTransfers).length === 0 ? (
@@ -971,8 +1212,8 @@
                     <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Icon name="CheckSquare" className="w-8 h-8" />
                     </div>
-                    <h4 className="font-bold text-slate-800 text-lg">¡Todo saldado!</h4>
-                    <p className="text-slate-500 mt-1 text-sm">Nadie debe nada en este momento.</p>
+                    <h4 className="font-bold text-slate-800 text-lg">{t.allSettled}</h4>
+                    <p className="text-slate-500 mt-1 text-sm">{t.nobodyOwes}</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -991,7 +1232,11 @@
                                 {creditor.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <p className="text-sm text-slate-500 font-medium">A <span className="font-bold text-slate-800">{creditor}</span> le deben</p>
+                                {lang === 'es' ? (
+                                  <p className="text-sm text-slate-500 font-medium">A <span className="font-bold text-slate-800">{creditor}</span> {t.isOwed}</p>
+                                ) : (
+                                  <p className="text-sm text-slate-500 font-medium"><span className="font-bold text-slate-800">{creditor}</span> {t.isOwed}</p>
+                                )}
                                 <p className="font-bold text-emerald-600 text-lg">{currencySymbol}{data.total.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span></p>
                               </div>
                             </div>
@@ -1003,19 +1248,19 @@
                           {/* Lista de Deudores (Expandido) */}
                           {isExpanded && (
                             <div className="bg-slate-50 border-t border-slate-100 p-4 space-y-3">
-                              {data.debts.map((t, i) => (
+                              {data.debts.map((tf, i) => (
                                 <div key={i} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                   <div className="flex items-center space-x-2">
-                                    <div className="font-bold text-slate-700 text-sm">{t.from}</div>
+                                    <div className="font-bold text-slate-700 text-sm">{tf.from}</div>
                                     <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
-                                    <div className="font-medium text-slate-500 text-sm">{t.to}</div>
+                                    <div className="font-medium text-slate-500 text-sm">{tf.to}</div>
                                   </div>
                                   <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
                                     <div className="font-bold text-slate-800">
-                                      {currencySymbol}{t.amount.toFixed(2)}
+                                      {currencySymbol}{tf.amount.toFixed(2)}
                                     </div>
-                                    <button onClick={() => onSettleDebt(t)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">
-                                      Marcar Pagado
+                                    <button onClick={() => onSettleDebt(tf)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">
+                                      {t.markPaid}
                                     </button>
                                   </div>
                                 </div>
@@ -1035,24 +1280,24 @@
                 {/* Gastado por Persona */}
                 <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                   <h3 className="font-bold text-slate-800 mb-3 flex items-center">
-                    <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> Dinero aportado
+                    <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> {t.netContributed}
                   </h3>
                   <div className="space-y-2">
-                    {Object.entries(totalSpentPerPerson).sort((a,b) => b[1] - a[1]).map(([person, amount]) => (
+                    {Object.entries(totalContributedPerPerson).sort((a,b) => b[1] - a[1]).map(([person, amount]) => (
                       <div key={person} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg">
                         <span className="font-medium text-slate-700 text-sm">{person}</span>
                         <span className="font-bold text-slate-800">{currencySymbol}{amount.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-slate-400 mt-3 text-center">Esto indica quién ha sacado dinero de su bolsillo, no deudas.</p>
+                  <p className="text-xs text-slate-400 mt-3 text-center">{t.netContributedDesc}</p>
                 </div>
 
                 {/* Gastos por Categoría */}
                 {Object.keys(categoryTotals).length > 0 && (
                   <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center">
-                      <Icon name="PieChart" className="w-4 h-4 mr-2 text-amber-500" /> Gastos por Categoría
+                      <Icon name="PieChart" className="w-4 h-4 mr-2 text-amber-500" /> {t.expensesByCategory}
                     </h3>
                     <div className="space-y-2">
                       {Object.entries(categoryTotals).sort((a,b) => b[1] - a[1]).map(([icon, amount]) => (
@@ -1074,12 +1319,12 @@
                 {biggestExpense && (
                   <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center">
-                      <Icon name="TrendingUp" className="w-4 h-4 mr-2 text-rose-500" /> Mayor gasto del viaje
+                      <Icon name="TrendingUp" className="w-4 h-4 mr-2 text-rose-500" /> {t.biggestExpense}
                     </h3>
                     <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl flex justify-between items-center">
                       <div>
                         <p className="font-bold text-rose-900 text-sm">{biggestExpense.description}</p>
-                        <p className="text-xs text-rose-600 mt-0.5">Pagado por {biggestExpense.paidBy}</p>
+                        <p className="text-xs text-rose-600 mt-0.5">{t.paidBy} {biggestExpense.paidBy}</p>
                       </div>
                       <span className="font-bold text-lg text-rose-700">{currencySymbol}{(biggestExpense.convertedAmount || biggestExpense.amount).toFixed(2)}</span>
                     </div>
@@ -1093,7 +1338,7 @@
     }
 
     // Modal para que el Creador añada personas libremente
-    function AddParticipantModal({ onClose, onSubmit }) {
+    function AddParticipantModal({ onClose, onSubmit, t }) {
       const [name, setName] = useState('');
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -1103,16 +1348,16 @@
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800">Añadir Persona</h2>
+              <h2 className="text-2xl font-bold text-slate-800">{t.addAnotherPerson}</h2>
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1.5">Nombre del participante</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.participantName}</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Ana" className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800" autoFocus />
               </div>
               <div className="pt-2 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Añadir</button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{t.add}</button>
               </div>
             </form>
           </div>
@@ -1121,7 +1366,7 @@
     }
 
     // Modal para Mapear la Identidad al Unirse
-    function MapIdentityModal({ trip, profileName, onClose, onConfirm }) {
+    function MapIdentityModal({ trip, profileName, onClose, onConfirm, t }) {
       const [selectedIdentity, setSelectedIdentity] = useState('__NEW__');
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -1130,8 +1375,8 @@
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200 p-4">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">¿Quién eres en este viaje?</h2>
-            <p className="text-slate-500 mb-6 text-sm font-medium">Es posible que el organizador ya haya empezado a añadir tus gastos. Si estás en la lista, selecciona tu nombre para reclamar tus gastos, de lo contrario, únete como uno nuevo.</p>
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">{t.whoAreYou}</h2>
+            <p className="text-slate-500 mb-6 text-sm font-medium">{t.whoAreYouDesc}</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-3">
                 <label className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === '__NEW__' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -1139,7 +1384,7 @@
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === '__NEW__' ? 'border-emerald-500' : 'border-slate-300'}`}>
                     {selectedIdentity === '__NEW__' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>}
                   </div>
-                  <span className="font-medium text-slate-800">Añadirme como nuevo:<br/><span className="font-bold text-emerald-700 text-lg">{profileName}</span></span>
+                  <span className="font-medium text-slate-800">{t.addNewAs}<br/><span className="font-bold text-emerald-700 text-lg">{profileName}</span></span>
                 </label>
                 {trip.participants.map(p => (
                   <label key={p} className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === p ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -1147,13 +1392,13 @@
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === p ? 'border-emerald-500' : 'border-slate-300'}`}>
                       {selectedIdentity === p && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>}
                     </div>
-                    <span className="font-medium text-slate-800">Ya estoy en el grupo como:<br/><span className="font-bold text-slate-600 text-lg">{p}</span></span>
+                    <span className="font-medium text-slate-800">{t.alreadyInGroupAs}<br/><span className="font-bold text-slate-600 text-lg">{p}</span></span>
                   </label>
                 ))}
               </div>
               <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Confirmar Identidad</button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{t.confirmIdentity}</button>
               </div>
             </form>
           </div>
@@ -1161,9 +1406,9 @@
       );
     }
 
-    function NewTripModal({ onClose, onSubmit }) {
+    function NewTripModal({ onClose, onSubmit, t }) {
       const [name, setName] = useState('');
-      const [baseCurrency, setBaseCurrency] = useState('USD');
+      const [baseCurrency, setBaseCurrency] = useState('EUR');
       const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
       const [endDate, setEndDate] = useState(() => {
         const d = new Date();
@@ -1190,11 +1435,11 @@
         setError('');
         const cleanParticipants = participants.map(p => p.trim()).filter(p => p !== '');
         if (!name.trim() || cleanParticipants.length < 2) {
-          setError("Por favor ingresa un nombre y al menos 2 participantes.");
+          setError(t.fillNameAndParticipants);
           return;
         }
         if (startDate && endDate && startDate > endDate) {
-          setError("La fecha de inicio no puede ser posterior a la fecha de fin.");
+          setError(t.dateError);
           return;
         }
         const uniqueParticipants = [...new Set(cleanParticipants)];
@@ -1204,7 +1449,7 @@
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">Crear Nuevo Viaje</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">{t.createNewTrip}</h2>
             
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl flex items-center text-sm font-medium">
@@ -1215,12 +1460,12 @@
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1.5">Nombre del Viaje</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Verano en Madrid" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 placeholder-slate-400" autoFocus />
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.tripName}</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="..." className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 placeholder-slate-400" autoFocus />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1.5">Moneda Principal del Viaje</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.mainCurrency}</label>
                 <div className="relative">
                   <Icon name="Globe" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <select value={baseCurrency} onChange={e => setBaseCurrency(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl pl-10 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white appearance-none">
@@ -1233,21 +1478,21 @@
 
               <div className="flex space-x-3">
                 <div className="flex-1">
-                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Desde (Opcional)</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.fromOptional}</label>
                   <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm" />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Hasta (Opcional)</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.toOptional}</label>
                   <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-3 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quiénes van?</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.whoIsGoing}</label>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2 pb-2">
                   {participants.map((p, i) => (
                     <div key={i} className="flex items-center space-x-2">
-                      <input type="text" value={p} onChange={e => handleChangeParticipant(i, e.target.value)} placeholder={`Persona ${i + 1}`} className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:outline-none transition-colors" />
+                      <input type="text" value={p} onChange={e => handleChangeParticipant(i, e.target.value)} placeholder="..." className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:outline-none transition-colors" />
                       {participants.length > 2 && (
                         <button type="button" onClick={() => handleRemoveParticipant(i)} className="p-2 text-slate-400 hover:text-red-500">
                           <Icon name="Trash2" className="w-5 h-5" />
@@ -1257,13 +1502,13 @@
                   ))}
                 </div>
                 <button type="button" onClick={handleAddParticipant} className="text-emerald-600 font-bold text-sm mt-3 flex items-center hover:text-emerald-700">
-                  <Icon name="Plus" className="w-4 h-4 mr-1" /> Añadir otra persona
+                  <Icon name="Plus" className="w-4 h-4 mr-1" /> {t.addAnotherPerson}
                 </button>
               </div>
 
               <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Crear Viaje</button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{t.createTrip}</button>
               </div>
             </form>
           </div>
@@ -1271,8 +1516,8 @@
       );
     }
 
-    function NewExpenseModal({ trip, expenseToEdit, onClose, onSubmit }) {
-      const tripCurrency = trip.baseCurrency || 'USD';
+    function NewExpenseModal({ trip, expenseToEdit, onClose, onSubmit, t }) {
+      const tripCurrency = trip.baseCurrency || 'EUR';
       const [description, setDescription] = useState(expenseToEdit ? expenseToEdit.description : '');
       const [amount, setAmount] = useState(expenseToEdit ? expenseToEdit.amount.toString() : '');
       const [date, setDate] = useState(expenseToEdit ? (expenseToEdit.date || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0]);
@@ -1320,15 +1565,15 @@
         const parsedRate = parseFloat(exchangeRate.toString().replace(',', '.'));
 
         if (!description.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
-          setError("Por favor ingresa una descripción y cantidad válida.");
+          setError(t.fillDescriptionAndAmount);
           return;
         }
         if (isNaN(parsedRate) || parsedRate <= 0) {
-          setError("Por favor ingresa una tasa de cambio válida.");
+          setError(t.fillRate);
           return;
         }
         if (splitAmong.length === 0) {
-          setError("Al menos una persona debe ser seleccionada para dividir.");
+          setError(t.selectOnePerson);
           return;
         }
         
@@ -1349,7 +1594,7 @@
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">{expenseToEdit ? 'Editar Gasto' : 'Añadir Gasto'}</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">{expenseToEdit ? t.editExpense : t.addExpense}</h2>
             
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl flex items-center text-sm font-medium">
@@ -1360,20 +1605,20 @@
             
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Para qué fue esto?</label>
-                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ej. Cena en pizzería" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors text-slate-800 placeholder-slate-400 font-medium" autoFocus />
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.whatFor}</label>
+                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="..." className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors text-slate-800 placeholder-slate-400 font-medium" autoFocus />
               </div>
 
               <div className="flex space-x-3">
                 <div className="flex-[2]">
-                  <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Cuánto fue?</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.howMuch}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{CURRENCIES[currency]?.symbol || '$'}</span>
                     <input type="text" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full border-2 border-slate-200 rounded-xl pl-8 pr-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800" />
                   </div>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Moneda</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.currency}</label>
                   <select value={currency} onChange={e => handleCurrencyChange(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white">
                     {Object.keys(CURRENCIES).map((code) => (
                       <option key={code} value={code}>{code}</option>
@@ -1387,13 +1632,13 @@
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-slate-500 flex items-center">
                       <Icon name="RefreshCw" className={`w-3 h-3 mr-1 ${isFetchingRate ? 'animate-spin' : ''}`} />
-                      Tasa de cambio (1 {currency} = X {tripCurrency})
+                      {t.exchangeRate} (1 {currency} = X {tripCurrency})
                     </label>
                   </div>
                   <input type="text" inputMode="decimal" value={exchangeRate} onChange={e => setExchangeRate(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none transition-colors text-sm font-medium text-slate-700" />
                   {amount && !isNaN(parseFloat(amount)) && !isNaN(parseFloat(exchangeRate)) && (
                     <p className="text-xs text-emerald-600 font-medium text-right">
-                      Total en viaje: {CURRENCIES[tripCurrency]?.symbol}{(parseFloat(amount) * parseFloat(exchangeRate)).toFixed(2)} {tripCurrency}
+                      {t.totalInTrip} {CURRENCIES[tripCurrency]?.symbol}{(parseFloat(amount) * parseFloat(exchangeRate)).toFixed(2)} {tripCurrency}
                     </p>
                   )}
                 </div>
@@ -1401,7 +1646,7 @@
 
               <div className="flex space-x-3">
                 <div className="flex-[2]">
-                  <label className="block text-sm font-bold text-slate-600 mb-1.5">¿Quién pagó?</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.paidBy}</label>
                   <select value={paidBy} onChange={e => setPaidBy(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 bg-white">
                     {trip.participants.map(p => (
                       <option key={p} value={p}>{p}</option>
@@ -1409,16 +1654,16 @@
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-bold text-slate-600 mb-1.5">Fecha</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.date}</label>
                   <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl px-2 py-3 focus:border-emerald-500 focus:outline-none transition-colors font-medium text-slate-800 text-sm" />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-bold text-slate-600">Dividir entre</label>
+                  <label className="block text-sm font-bold text-slate-600">{t.splitAmong}</label>
                   <button type="button" onClick={selectAll} className="text-xs text-emerald-600 font-bold hover:underline">
-                    Seleccionar Todos
+                    {t.selectAll}
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -1435,9 +1680,9 @@
               </div>
 
               <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
                 <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-                  {expenseToEdit ? 'Guardar Cambios' : 'Guardar Gasto'}
+                  {expenseToEdit ? t.saveChanges : t.saveExpense}
                 </button>
               </div>
             </form>
@@ -1446,7 +1691,7 @@
       );
     }
 
-    function ConfirmModal({ title, message, onCancel, onConfirm }) {
+    function ConfirmModal({ title, message, onCancel, onConfirm, t }) {
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200 p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1456,15 +1701,15 @@
             </div>
             <p className="text-slate-600 mb-6 font-medium">{message}</p>
             <div className="flex space-x-3">
-              <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-              <button onClick={onConfirm} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">Eliminar</button>
+              <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
+              <button onClick={onConfirm} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200">{t.delete}</button>
             </div>
           </div>
         </div>
       );
     }
 
-    function JoinTripModal({ onClose, onSubmit }) {
+    function JoinTripModal({ onClose, onSubmit, t }) {
       const [code, setCode] = useState('');
 
       const handleSubmit = (e) => {
@@ -1476,18 +1721,18 @@
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800">Unirse a un Viaje</h2>
+              <h2 className="text-2xl font-bold text-slate-800">{t.joinTrip}</h2>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-1.5">Código de Invitación</label>
-                <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="Ej. ABCDEF" maxLength={8} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-mono font-bold text-slate-800 text-center text-2xl tracking-widest uppercase" autoFocus />
-                <p className="text-xs text-slate-500 mt-2 text-center">Pídele a quien creó el viaje que te comparta el código.</p>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">{t.inviteCode}</label>
+                <input type="text" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="..." maxLength={8} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-mono font-bold text-slate-800 text-center text-2xl tracking-widest uppercase" autoFocus />
+                <p className="text-xs text-slate-500 mt-2 text-center">{t.askForCode}</p>
               </div>
               <div className="pt-2 flex space-x-3">
-                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Unirse</button>
+                <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
+                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{t.join}</button>
               </div>
             </form>
           </div>
