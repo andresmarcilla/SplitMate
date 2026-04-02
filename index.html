@@ -732,9 +732,27 @@
     function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt }) {
       const [activeTab, setActiveTab] = useState('expenses');
       const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+      const [expandedCreditors, setExpandedCreditors] = useState({});
 
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
       const transfers = useMemo(() => simplifyDebts(balances), [balances]);
+
+      // --- Agrupar transferencias por Acreedor ---
+      const groupedTransfers = useMemo(() => {
+        const groups = {};
+        transfers.forEach(t => {
+          if (!groups[t.to]) {
+            groups[t.to] = { total: 0, debts: [] };
+          }
+          groups[t.to].total += t.amount;
+          groups[t.to].debts.push(t);
+        });
+        return groups;
+      }, [transfers]);
+
+      const toggleCreditor = (creditor) => {
+        setExpandedCreditors(prev => ({ ...prev, [creditor]: !prev[creditor] }));
+      };
 
       const baseCurrency = trip.baseCurrency || 'USD';
       const currencySymbol = CURRENCIES[baseCurrency]?.symbol || '$';
@@ -786,13 +804,12 @@
         <div className="animate-in fade-in duration-300">
           
           {/* Panel Superior Fijo (Sticky) */}
-          <div className="sticky top-[60px] bg-slate-50 z-20 px-4 pt-4 pb-3 shadow-sm border-b border-slate-200">
+          <div className="sticky top-[60px] bg-slate-50/95 backdrop-blur-md z-20 px-4 pt-4 pb-3 shadow-sm border-b border-slate-200">
             
             {/* Tarjeta de Resumen Colapsable */}
             <div 
               className="bg-slate-800 rounded-2xl p-4 text-white mb-4 shadow-lg shadow-slate-300 relative cursor-pointer hover:bg-slate-700 transition-colors"
               onClick={(e) => {
-                // Prevenir que se contraiga si el usuario hace clic dentro de un botón interior
                 if(e.target.closest('button')) return;
                 setIsOverviewExpanded(!isOverviewExpanded);
               }}
@@ -885,7 +902,7 @@
           </div>
 
           {/* Contenedor Inferior de Listas que hace scroll */}
-          <div className="px-4 pb-8">
+          <div className="px-4 pb-8 pt-2">
             {activeTab === 'expenses' && (
               <div className="space-y-3">
                 {expenses.length === 0 ? (
@@ -946,10 +963,10 @@
                   <h3 className="font-bold text-emerald-800 flex items-center">
                     <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> Deudas Simplificadas
                   </h3>
-                  <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas.</p>
+                  <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas, agrupadas por a quién se le debe.</p>
                 </div>
 
-                {transfers.length === 0 ? (
+                {Object.keys(groupedTransfers).length === 0 ? (
                   <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl shadow-sm">
                     <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Icon name="CheckSquare" className="w-8 h-8" />
@@ -958,24 +975,56 @@
                     <p className="text-slate-500 mt-1 text-sm">Nadie debe nada en este momento.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {transfers.map((t, i) => (
-                      <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="font-bold text-slate-700">{t.from}</div>
-                          <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
-                          <div className="font-bold text-slate-700">{t.to}</div>
-                        </div>
-                        <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
-                          <div className="font-bold text-emerald-600 text-lg">
-                            {currencySymbol}{t.amount.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span>
+                  <div className="space-y-4">
+                    {Object.entries(groupedTransfers).map(([creditor, data]) => {
+                      const isExpanded = expandedCreditors[creditor];
+                      return (
+                        <div key={creditor} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                          
+                          {/* Cabecera del Acreedor (Colapsable) */}
+                          <div 
+                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                            onClick={() => toggleCreditor(creditor)}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold text-lg">
+                                {creditor.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm text-slate-500 font-medium">A <span className="font-bold text-slate-800">{creditor}</span> le deben</p>
+                                <p className="font-bold text-emerald-600 text-lg">{currencySymbol}{data.total.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span></p>
+                              </div>
+                            </div>
+                            <div className="bg-slate-100 p-1.5 rounded-full flex items-center justify-center text-slate-500">
+                              <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} className="w-5 h-5" />
+                            </div>
                           </div>
-                          <button onClick={() => onSettleDebt(t)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors">
-                            Marcar Pagado
-                          </button>
+
+                          {/* Lista de Deudores (Expandido) */}
+                          {isExpanded && (
+                            <div className="bg-slate-50 border-t border-slate-100 p-4 space-y-3">
+                              {data.debts.map((t, i) => (
+                                <div key={i} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="font-bold text-slate-700 text-sm">{t.from}</div>
+                                    <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
+                                    <div className="font-medium text-slate-500 text-sm">{t.to}</div>
+                                  </div>
+                                  <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
+                                    <div className="font-bold text-slate-800">
+                                      {currencySymbol}{t.amount.toFixed(2)}
+                                    </div>
+                                    <button onClick={() => onSettleDebt(t)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">
+                                      Marcar Pagado
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1452,6 +1501,3 @@
   </script>
 </body>
 </html>
-
-
-```
