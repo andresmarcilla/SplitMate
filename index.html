@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -27,7 +28,7 @@
     const { useState, useEffect, useMemo } = React;
 
     // ==========================================
-    // TUS CREENCIALES DE FIREBASE (ACTUALIZADAS)
+    // TUS CREENCIALES DE FIREBASE
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyA3hznC34W5T4ZYTkFbp8-GRkiiNFDCuX8",
@@ -38,7 +39,7 @@
       appId: "1:315682667125:web:5e6bc5923b275ee3f4d63c"
     };
 
-    const appId = 'splitmate-prod'; // ID base para las rutas de Firestore
+    const appId = 'splitmate-prod'; 
 
     // Inicializar Firebase
     const app = initializeApp(firebaseConfig);
@@ -52,6 +53,8 @@
         Users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
         Plus: <><path d="M5 12h14"/><path d="M12 5v14"/></>,
         ChevronLeft: <path d="m15 18-6-6 6-6"/>,
+        ChevronDown: <polyline points="6 9 12 15 18 9"/>,
+        ChevronUp: <polyline points="18 15 12 9 6 15"/>,
         Trash2: <><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>,
         ArrowRight: <><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></>,
         CheckSquare: <><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
@@ -67,7 +70,9 @@
         Receipt: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></>,
         LogOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>,
         X: <><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>,
-        UserCircle: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></>
+        UserCircle: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></>,
+        PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
+        TrendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>
       };
       return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -78,10 +83,10 @@
 
     // --- Constantes de Monedas ---
     const CURRENCIES = {
-      EUR: { symbol: '€', name: 'Euro (EUR)' },
-      ARS: { symbol: '$', name: 'Peso Argentino (ARS)' },
       USD: { symbol: '$', name: 'US Dollar (USD)' },
+      EUR: { symbol: '€', name: 'Euro (EUR)' },
       MXN: { symbol: '$', name: 'Peso Mexicano (MXN)' },
+      ARS: { symbol: '$', name: 'Peso Argentino (ARS)' },
       COP: { symbol: '$', name: 'Peso Colombiano (COP)' },
       CLP: { symbol: '$', name: 'Peso Chileno (CLP)' },
       PEN: { symbol: 'S/', name: 'Sol Peruano (PEN)' },
@@ -304,11 +309,9 @@
           
           if (tripToJoin) {
             if (tripToJoin.participants.includes(profileName)) {
-              // El usuario ya existe exactamente con ese nombre
               setShowJoinTripModal(false);
               setCurrentTripId(tripToJoin.id); 
             } else {
-              // El usuario no está, o está bajo otro nombre. Mostrar modal de mapeo.
               setTripToMap(tripToJoin);
               setShowJoinTripModal(false);
               setShowMapIdentityModal(true);
@@ -324,19 +327,15 @@
 
       const handleConfirmIdentityMapping = async (tripToJoin, selectedIdentity) => {
         if (selectedIdentity === '__NEW__') {
-          // Se añade como participante nuevo
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
             participants: arrayUnion(profileName)
           });
         } else {
-          // Reclamar identidad existente (Reemplazar nombre antiguo por profileName)
-          // 1. Actualizar participantes en el viaje
           const newParticipants = [...new Set(tripToJoin.participants.map(p => p === selectedIdentity ? profileName : p))];
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
             participants: newParticipants
           });
 
-          // 2. Actualizar gastos asociados a esa persona
           const relatedExpenses = expenses.filter(e => e.tripId === tripToJoin.id && (e.paidBy === selectedIdentity || e.splitAmong.includes(selectedIdentity)));
           
           for (const exp of relatedExpenses) {
@@ -405,10 +404,7 @@
 
       const handleDeleteTrip = async (tripId) => {
         if (!user || !tripId) return;
-        
-        // Volver al inicio inmediatamente para evitar que la pantalla quede en blanco
         setCurrentTripId(null);
-        
         const relatedExpenses = expenses.filter(e => e.tripId === tripId);
         for (const exp of relatedExpenses) {
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
@@ -443,15 +439,14 @@
       const myTrips = trips.filter(t => t.participants.includes(profileName));
       const currentTrip = trips.find(t => t.id === currentTripId);
       const tripExpenses = expenses.filter(e => e.tripId === currentTripId);
-
       const isTripView = currentTripId && currentTrip;
 
       return (
-        <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-20">
-          <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl relative overflow-hidden">
+        <div className="min-h-screen bg-slate-100 font-sans text-slate-900 pb-10">
+          <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl relative flex flex-col">
             
-            <header className="bg-emerald-600 text-white p-4 sticky top-0 z-10 shadow-md">
-              <div className="flex items-center justify-between">
+            <header className="bg-emerald-600 text-white px-4 h-[60px] flex items-center justify-between shrink-0 sticky top-0 z-30 shadow-md">
+              <div className="flex items-center justify-between w-full">
                 {isTripView ? (
                   <button onClick={() => setCurrentTripId(null)} className="flex items-center text-emerald-50 hover:text-white transition-colors">
                     <Icon name="ChevronLeft" className="w-6 h-6 mr-1" />
@@ -478,14 +473,16 @@
               </div>
             </header>
 
-            <main className="p-4">
+            <main className="flex-1 relative bg-slate-50/30">
               {!isTripView ? (
-                <Dashboard 
-                  trips={myTrips} 
-                  onSelectTrip={setCurrentTripId} 
-                  onNewTrip={() => setShowNewTripModal(true)} 
-                  onJoinTrip={() => setShowJoinTripModal(true)}
-                />
+                <div className="p-4">
+                  <Dashboard 
+                    trips={myTrips} 
+                    onSelectTrip={setCurrentTripId} 
+                    onNewTrip={() => setShowNewTripModal(true)} 
+                    onJoinTrip={() => setShowJoinTripModal(true)}
+                  />
+                </div>
               ) : (
                 <TripDetail 
                   trip={currentTrip} 
@@ -634,14 +631,8 @@
             <p className="text-slate-500 mb-8 font-medium">Inicia sesión o entra como invitado para organizar tus gastos de viaje.</p>
             
             <div className="space-y-4">
-              <button 
-                onClick={handleGoogleLogin} 
-                disabled={isLoading}
-                className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <span>Conectando...</span>
-                ) : (
+              <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+                {isLoading ? <span>Conectando...</span> : (
                   <>
                     <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -659,13 +650,8 @@
                 <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">O también</span></div>
               </div>
 
-              <button 
-                onClick={handleAnonymousLogin} 
-                disabled={isLoading}
-                className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                <Icon name="UserCircle" className="w-5 h-5 mr-2" />
-                Continuar como Invitado
+              <button onClick={handleAnonymousLogin} disabled={isLoading} className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> Continuar como Invitado
               </button>
             </div>
           </div>
@@ -675,18 +661,15 @@
 
     function WelcomeScreen({ onSave }) {
       const [name, setName] = useState('');
-
       const handleSubmit = (e) => {
         e.preventDefault();
         if (name.trim()) onSave(name.trim());
       };
-
       return (
         <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans">
           <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
             <h1 className="text-2xl font-bold text-slate-800 mb-2">Un último paso</h1>
             <p className="text-slate-500 mb-8 font-medium">Como entraste de invitado, dinos cómo te llamas para que tus amigos te reconozcan.</p>
-            
             <form onSubmit={handleSubmit} className="space-y-4">
               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre (Ej. Carlos)" className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
               <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">Guardar e Ingresar</button>
@@ -749,6 +732,7 @@
 
     function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt }) {
       const [activeTab, setActiveTab] = useState('expenses');
+      const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
       const transfers = useMemo(() => simplifyDebts(balances), [balances]);
@@ -757,9 +741,30 @@
       const currencySymbol = CURRENCIES[baseCurrency]?.symbol || '$';
       const isCreatorUser = user.uid === trip.createdBy;
 
+      // --- Cálculos para el nuevo Resumen ---
+      const totalSpentPerPerson = {};
+      trip.participants.forEach(p => totalSpentPerPerson[p] = 0);
+      const categoryTotals = {};
+      let biggestExpense = null;
+
       const totalSpent = expenses
         .filter(exp => !exp.isSettlement)
-        .reduce((sum, exp) => sum + (exp.convertedAmount !== undefined ? Number(exp.convertedAmount) : Number(exp.amount)), 0);
+        .reduce((sum, exp) => {
+          const amount = exp.convertedAmount !== undefined ? Number(exp.convertedAmount) : Number(exp.amount);
+          
+          if (totalSpentPerPerson[exp.paidBy] !== undefined) {
+             totalSpentPerPerson[exp.paidBy] += amount;
+          }
+          
+          const icon = getExpenseIcon(exp.description, false);
+          categoryTotals[icon] = (categoryTotals[icon] || 0) + amount;
+
+          if (!biggestExpense || amount > (biggestExpense.convertedAmount || biggestExpense.amount)) {
+             biggestExpense = exp;
+          }
+
+          return sum + amount;
+        }, 0);
 
       const copyCode = () => {
         const textArea = document.createElement("textarea");
@@ -768,12 +773,10 @@
         textArea.style.left = "-999999px";
         document.body.appendChild(textArea);
         textArea.select();
-        
         try {
           document.execCommand('copy');
           alert(`¡Código ${trip.inviteCode} copiado al portapapeles! Dáselo a tus amigos.`);
         } catch(e) {
-          console.error("Error al copiar: ", e);
           alert(`No se pudo copiar el código. Por favor cópialo manualmente: ${trip.inviteCode}`);
         } finally {
           document.body.removeChild(textArea);
@@ -782,87 +785,116 @@
 
       return (
         <div className="animate-in fade-in duration-300">
-          <div className="bg-slate-800 rounded-2xl p-5 text-white mb-6 shadow-lg shadow-slate-300 relative">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-slate-300 text-sm font-medium">Gastos Totales del Viaje</p>
-                <h2 className="text-3xl font-bold mt-1">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
-              </div>
-              {isCreatorUser && (
-                <button onClick={onDeleteTrip} className="text-slate-400 hover:text-red-400 transition-colors p-2 -mr-2 -mt-2" title="Eliminar Viaje">
-                  <Icon name="Trash2" className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-
-            {trip.inviteCode && (
-              <div className="mt-4 bg-slate-700/50 rounded-xl p-3 border border-slate-600 flex items-center justify-between">
+          
+          {/* Panel Superior Fijo (Sticky) */}
+          <div className="sticky top-[60px] bg-slate-50 z-20 px-4 pt-4 pb-3 shadow-sm border-b border-slate-200">
+            
+            {/* Tarjeta de Resumen Colapsable */}
+            <div 
+              className="bg-slate-800 rounded-2xl p-4 text-white mb-4 shadow-lg shadow-slate-300 relative cursor-pointer hover:bg-slate-700 transition-colors"
+              onClick={(e) => {
+                // Prevenir que se contraiga si el usuario hace clic dentro de un botón interior
+                if(e.target.closest('button')) return;
+                setIsOverviewExpanded(!isOverviewExpanded);
+              }}
+            >
+              <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-slate-300 font-medium">Código de Invitación</p>
-                  <p className="text-lg font-mono font-bold tracking-widest text-emerald-400">{trip.inviteCode}</p>
+                  <p className="text-slate-300 text-xs font-medium uppercase tracking-wider">Gastos Totales</p>
+                  <h2 className="text-2xl font-bold mt-0.5">{currencySymbol}{totalSpent.toFixed(2)} <span className="text-sm font-normal text-slate-400">{baseCurrency}</span></h2>
                 </div>
-                <button onClick={copyCode} className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" title="Copiar código">
-                  <Icon name="Copy" className="w-4 h-4 text-white" />
-                </button>
+                <div className="bg-slate-700 p-1.5 rounded-full flex items-center justify-center">
+                  <Icon name={isOverviewExpanded ? "ChevronUp" : "ChevronDown"} className="w-5 h-5 text-slate-300" />
+                </div>
               </div>
-            )}
 
-            <div className="flex flex-wrap items-center gap-2 mt-4">
-              {trip.participants.map(p => {
-                const isCurrentUser = p === profileName;
-                // El creador puede eliminar a todos menos a sí mismo, un usuario normal solo puede eliminarse a sí mismo
-                const canRemove = (isCreatorUser && !isCurrentUser) || (!isCreatorUser && isCurrentUser);
-
-                return (
-                  <span key={p} className="bg-slate-700 text-slate-200 text-xs pl-2.5 pr-1.5 py-1 rounded-full font-medium flex items-center shadow-sm">
-                    {p}
-                    {canRemove && (
-                      <button onClick={() => onRemoveParticipant(p)} className="ml-1 text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-slate-600" title={isCurrentUser ? "Salir del viaje" : "Eliminar del viaje"}>
-                        <Icon name="X" className="w-3 h-3" />
+              {isOverviewExpanded && (
+                <div className="mt-4 pt-4 border-t border-slate-600 animate-in fade-in duration-300 cursor-default">
+                  
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-sm font-medium text-slate-300">Detalles del Grupo</p>
+                    {isCreatorUser && (
+                      <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title="Eliminar Viaje">
+                        <Icon name="Trash2" className="w-5 h-5" />
                       </button>
                     )}
-                  </span>
-                );
-              })}
-              
-              {isCreatorUser && (
-                <button onClick={onAddParticipant} className="bg-emerald-100/10 text-emerald-100 hover:bg-emerald-100/20 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-100/20 shadow-sm ml-1">
-                  <Icon name="Plus" className="w-3 h-3 mr-1" /> Añadir
-                </button>
+                  </div>
+
+                  {trip.inviteCode && (
+                    <div className="bg-slate-700/50 rounded-xl p-3 border border-slate-600 flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs text-slate-300 font-medium">Código de Invitación</p>
+                        <p className="text-lg font-mono font-bold tracking-widest text-emerald-400">{trip.inviteCode}</p>
+                      </div>
+                      <button onClick={copyCode} className="p-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors" title="Copiar código">
+                        <Icon name="Copy" className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {trip.participants.map(p => {
+                      const isCurrentUser = p === profileName;
+                      const canRemove = (isCreatorUser && !isCurrentUser) || (!isCreatorUser && isCurrentUser);
+                      return (
+                        <span key={p} className="bg-slate-700 text-slate-200 text-xs pl-2.5 pr-1.5 py-1 rounded-full font-medium flex items-center shadow-sm">
+                          {p}
+                          {canRemove && (
+                            <button onClick={() => onRemoveParticipant(p)} className="ml-1 text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-slate-600" title={isCurrentUser ? "Salir del viaje" : "Eliminar del viaje"}>
+                              <Icon name="X" className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                    
+                    {isCreatorUser && (
+                      <button onClick={onAddParticipant} className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-500/30 shadow-sm ml-1">
+                        <Icon name="Plus" className="w-3 h-3 mr-1" /> Añadir
+                      </button>
+                    )}
+                  </div>
+                  
+                  {(trip.startDate || trip.endDate || trip.date) && (
+                    <div className="mt-4 flex items-center text-slate-300 text-xs font-medium">
+                      <Icon name="Calendar" className="w-4 h-4 mr-1.5" />
+                      {formatDateRange(trip.startDate || trip.date, trip.endDate)}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-            
-            {(trip.startDate || trip.endDate || trip.date) && (
-              <div className="mt-3 flex items-center text-slate-300 text-xs font-medium">
-                <Icon name="Calendar" className="w-4 h-4 mr-1.5" />
-                {formatDateRange(trip.startDate || trip.date, trip.endDate)}
-              </div>
-            )}
-          </div>
 
-          <div className="flex bg-slate-200 rounded-xl p-1 mb-6">
-            <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
-              Gastos
-            </button>
-            <button onClick={() => setActiveTab('balances')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>
-              Liquidar Deudas
-            </button>
-          </div>
-
-          {activeTab === 'expenses' && (
-            <div className="space-y-4">
-              <button onClick={onAddExpense} className="w-full bg-emerald-100 text-emerald-700 border border-emerald-200 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-200 active:scale-95 transition-all">
-                <Icon name="Receipt" className="w-5 h-5" />
-                <span>Añadir un Gasto</span>
+            {/* Pestañas de Navegación */}
+            <div className="flex bg-slate-200/80 p-1 rounded-xl mb-3 border border-slate-200">
+              <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
+                <span className="hidden sm:inline mr-1">🧾</span> Gastos
               </button>
+              <button onClick={() => setActiveTab('balances')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'balances' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>
+                <span className="hidden sm:inline mr-1">💸</span> Deudas
+              </button>
+              <button onClick={() => setActiveTab('summary')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'summary' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
+                <span className="hidden sm:inline mr-1">📊</span> Info
+              </button>
+            </div>
 
-              {expenses.length === 0 ? (
-                <div className="text-center p-8">
-                  <p className="text-slate-400">Aún no hay gastos registrados.</p>
-                </div>
-              ) : (
-                <div className="space-y-3 pb-8">
-                  {expenses.map(exp => {
+            {/* Botón Añadir Gasto - Siempre Visible */}
+            <button onClick={onAddExpense} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-200">
+              <Icon name="Plus" className="w-5 h-5" />
+              <span>Añadir un Gasto</span>
+            </button>
+          </div>
+
+          {/* Contenedor Inferior de Listas que hace scroll */}
+          <div className="px-4 pb-8">
+            {activeTab === 'expenses' && (
+              <div className="space-y-3">
+                {expenses.length === 0 ? (
+                  <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl">
+                    <p className="text-slate-400">Aún no hay gastos registrados.</p>
+                  </div>
+                ) : (
+                  expenses.map(exp => {
                     const icon = getExpenseIcon(exp.description, exp.isSettlement);
                     return (
                       <div key={exp.id} className={`bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between ${exp.isSettlement ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100'}`}>
@@ -887,7 +919,7 @@
                             {exp.currency && exp.currency !== baseCurrency ? (
                               <div className="flex flex-col items-end">
                                 <span>{CURRENCIES[exp.currency]?.symbol || '$'}{Number(exp.amount).toFixed(2)}</span>
-                                <span className="text-xs text-slate-400 font-medium">~{currencySymbol}{Number(exp.convertedAmount).toFixed(2)} <span className="text-[10px]">{baseCurrency}</span></span>
+                                <span className="text-xs text-slate-400 font-medium">~{currencySymbol}{Number(exp.convertedAmount).toFixed(2)}</span>
                               </div>
                             ) : (
                               <span>{currencySymbol}{Number(exp.amount).toFixed(2)}</span>
@@ -904,53 +936,110 @@
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'balances' && (
-            <div className="space-y-4 pb-8">
-              <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4">
-                <h3 className="font-bold text-emerald-800 flex items-center">
-                  <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> 
-                  Deudas Simplificadas
-                </h3>
-                <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas.</p>
+                  })
+                )}
               </div>
+            )}
 
-              {transfers.length === 0 ? (
-                <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                  <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Icon name="CheckSquare" className="w-8 h-8" />
-                  </div>
-                  <h4 className="font-bold text-slate-800 text-lg">¡Todo saldado!</h4>
-                  <p className="text-slate-500 mt-1 text-sm">Nadie debe nada en este momento.</p>
+            {activeTab === 'balances' && (
+              <div className="space-y-4">
+                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4">
+                  <h3 className="font-bold text-emerald-800 flex items-center">
+                    <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> Deudas Simplificadas
+                  </h3>
+                  <p className="text-sm text-emerald-600 mt-1">Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas.</p>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {transfers.map((t, i) => (
-                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="font-bold text-slate-700">{t.from}</div>
-                        <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
-                        <div className="font-bold text-slate-700">{t.to}</div>
-                      </div>
-                      <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
-                        <div className="font-bold text-emerald-600 text-lg">
-                          {currencySymbol}{t.amount.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span>
-                        </div>
-                        <button onClick={() => onSettleDebt(t)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors">
-                          Marcar Pagado
-                        </button>
-                      </div>
+
+                {transfers.length === 0 ? (
+                  <div className="text-center p-8 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                    <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Icon name="CheckSquare" className="w-8 h-8" />
                     </div>
-                  ))}
+                    <h4 className="font-bold text-slate-800 text-lg">¡Todo saldado!</h4>
+                    <p className="text-slate-500 mt-1 text-sm">Nadie debe nada en este momento.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {transfers.map((t, i) => (
+                      <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="font-bold text-slate-700">{t.from}</div>
+                          <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
+                          <div className="font-bold text-slate-700">{t.to}</div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
+                          <div className="font-bold text-emerald-600 text-lg">
+                            {currencySymbol}{t.amount.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span>
+                          </div>
+                          <button onClick={() => onSettleDebt(t)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors">
+                            Marcar Pagado
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'summary' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Gastado por Persona */}
+                <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center">
+                    <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> Dinero aportado
+                  </h3>
+                  <div className="space-y-2">
+                    {Object.entries(totalSpentPerPerson).sort((a,b) => b[1] - a[1]).map(([person, amount]) => (
+                      <div key={person} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg">
+                        <span className="font-medium text-slate-700 text-sm">{person}</span>
+                        <span className="font-bold text-slate-800">{currencySymbol}{amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-3 text-center">Esto indica quién ha sacado dinero de su bolsillo, no deudas.</p>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Gastos por Categoría */}
+                {Object.keys(categoryTotals).length > 0 && (
+                  <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center">
+                      <Icon name="PieChart" className="w-4 h-4 mr-2 text-amber-500" /> Gastos por Categoría
+                    </h3>
+                    <div className="space-y-2">
+                      {Object.entries(categoryTotals).sort((a,b) => b[1] - a[1]).map(([icon, amount]) => (
+                        <div key={icon} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg">
+                          <div className="flex items-center">
+                            <span className="text-xl mr-3">{icon}</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase">
+                              {((amount / totalSpent) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <span className="font-bold text-slate-800">{currencySymbol}{amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Mayor Gasto */}
+                {biggestExpense && (
+                  <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center">
+                      <Icon name="TrendingUp" className="w-4 h-4 mr-2 text-rose-500" /> Mayor gasto del viaje
+                    </h3>
+                    <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-rose-900 text-sm">{biggestExpense.description}</p>
+                        <p className="text-xs text-rose-600 mt-0.5">Pagado por {biggestExpense.paidBy}</p>
+                      </div>
+                      <span className="font-bold text-lg text-rose-700">{currencySymbol}{(biggestExpense.convertedAmount || biggestExpense.amount).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       );
     }
@@ -986,18 +1075,15 @@
     // Modal para Mapear la Identidad al Unirse
     function MapIdentityModal({ trip, profileName, onClose, onConfirm }) {
       const [selectedIdentity, setSelectedIdentity] = useState('__NEW__');
-      
       const handleSubmit = (e) => {
         e.preventDefault();
         onConfirm(trip, selectedIdentity);
       };
-      
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200 p-4">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">¿Quién eres en este viaje?</h2>
             <p className="text-slate-500 mb-6 text-sm font-medium">Es posible que el organizador ya haya empezado a añadir tus gastos. Si estás en la lista, selecciona tu nombre para reclamar tus gastos, de lo contrario, únete como uno nuevo.</p>
-            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-3">
                 <label className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === '__NEW__' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -1007,7 +1093,6 @@
                   </div>
                   <span className="font-medium text-slate-800">Añadirme como nuevo:<br/><span className="font-bold text-emerald-700 text-lg">{profileName}</span></span>
                 </label>
-                
                 {trip.participants.map(p => (
                   <label key={p} className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === p ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="identity" value={p} checked={selectedIdentity === p} onChange={() => setSelectedIdentity(p)} className="hidden" />
@@ -1018,7 +1103,6 @@
                   </label>
                 ))}
               </div>
-              
               <div className="pt-4 flex space-x-3">
                 <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
                 <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Confirmar Identidad</button>
@@ -1369,3 +1453,6 @@
   </script>
 </body>
 </html>
+
+
+```
