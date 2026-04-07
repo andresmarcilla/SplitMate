@@ -80,13 +80,16 @@
         splitWith: "Dividido con",
         everyone: "Todos",
         simplifiedDebts: "Deudas Simplificadas",
-        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas, agrupadas por a quién se le debe.",
+        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas, agrupadas por quién debe pagar.",
         allSettled: "¡Todo saldado!",
         nobodyOwes: "Nadie debe nada en este momento.",
-        isOwed: "le deben",
+        needsToPay: "debe pagar",
         markPaid: "Marcar Pagado",
         netContributed: "Dinero aportado (Neto)",
         netContributedDesc: "Esto indica el dinero real que ha salido del bolsillo de cada persona, teniendo en cuenta las deudas saldadas.",
+        isOwedAmount: "Le deben:",
+        owesAmount: "Debe:",
+        upToDate: "Al día",
         expensesByCategory: "Gastos por Categoría",
         biggestExpense: "Mayor gasto del plan",
         tripName: "Nombre del Plan",
@@ -137,6 +140,7 @@
         fillRate: "Por favor ingresa una tasa de cambio válida.",
         selectOnePerson: "Al menos una persona debe ser seleccionada para dividir.",
         paymentOf: "Pago de",
+        toPerson: "A",
         to: "a"
       },
       en: {
@@ -172,13 +176,16 @@
         splitWith: "Split with",
         everyone: "Everyone",
         simplifiedDebts: "Simplified Debts",
-        debtsDesc: "We've calculated the minimum number of transfers needed to settle all debts, grouped by who is owed.",
+        debtsDesc: "We've calculated the minimum number of transfers needed to settle all debts, grouped by who needs to pay.",
         allSettled: "All settled!",
         nobodyOwes: "Nobody owes anything right now.",
-        isOwed: "is owed",
+        needsToPay: "needs to pay",
         markPaid: "Mark Paid",
         netContributed: "Net Contributed",
         netContributedDesc: "This indicates the actual money that has left each person's pocket, taking into account settled debts.",
+        isOwedAmount: "Is owed:",
+        owesAmount: "Owes:",
+        upToDate: "Settled",
         expensesByCategory: "Expenses by Category",
         biggestExpense: "Biggest plan expense",
         tripName: "Plan Name",
@@ -229,6 +236,7 @@
         fillRate: "Please enter a valid exchange rate.",
         selectOnePerson: "At least one person must be selected to split.",
         paymentOf: "Payment from",
+        toPerson: "To",
         to: "to"
       }
     };
@@ -952,23 +960,24 @@
     function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt, t, lang }) {
       const [activeTab, setActiveTab] = useState('expenses');
       const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
-      const [expandedCreditors, setExpandedCreditors] = useState({});
+      const [expandedDebtors, setExpandedDebtors] = useState({});
 
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
       const transfers = useMemo(() => simplifyDebts(balances), [balances]);
 
+      // --- Agrupar transferencias por Deudor (quién debe pagar) ---
       const groupedTransfers = useMemo(() => {
         const groups = {};
         transfers.forEach(tf => {
-          if (!groups[tf.to]) { groups[tf.to] = { total: 0, debts: [] }; }
-          groups[tf.to].total += tf.amount;
-          groups[tf.to].debts.push(tf);
+          if (!groups[tf.from]) { groups[tf.from] = { total: 0, debts: [] }; }
+          groups[tf.from].total += tf.amount;
+          groups[tf.from].debts.push(tf);
         });
         return groups;
       }, [transfers]);
 
-      const toggleCreditor = (creditor) => {
-        setExpandedCreditors(prev => ({ ...prev, [creditor]: !prev[creditor] }));
+      const toggleDebtor = (debtor) => {
+        setExpandedDebtors(prev => ({ ...prev, [debtor]: !prev[debtor] }));
       };
 
       const baseCurrency = trip.baseCurrency || 'USD';
@@ -1217,27 +1226,25 @@
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {Object.entries(groupedTransfers).map(([creditor, data]) => {
-                      const isExpanded = expandedCreditors[creditor];
+                    {Object.entries(groupedTransfers).map(([debtor, data]) => {
+                      const isExpanded = expandedDebtors[debtor];
                       return (
-                        <div key={creditor} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div key={debtor} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                           
-                          {/* Cabecera del Acreedor (Colapsable) */}
+                          {/* Cabecera del Deudor (Colapsable) */}
                           <div 
                             className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
-                            onClick={() => toggleCreditor(creditor)}
+                            onClick={() => toggleDebtor(debtor)}
                           >
                             <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold text-lg">
-                                {creditor.charAt(0).toUpperCase()}
+                              <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center font-bold text-lg">
+                                {debtor.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                {lang === 'es' ? (
-                                  <p className="text-sm text-slate-500 font-medium">A <span className="font-bold text-slate-800">{creditor}</span> {t.isOwed}</p>
-                                ) : (
-                                  <p className="text-sm text-slate-500 font-medium"><span className="font-bold text-slate-800">{creditor}</span> {t.isOwed}</p>
-                                )}
-                                <p className="font-bold text-emerald-600 text-lg">{currencySymbol}{data.total.toFixed(2)} <span className="text-xs text-emerald-600/70">{baseCurrency}</span></p>
+                                <p className="text-sm text-slate-500 font-medium">
+                                  <span className="font-bold text-slate-800">{debtor}</span> {t.needsToPay}
+                                </p>
+                                <p className="font-bold text-rose-500 text-lg">{currencySymbol}{data.total.toFixed(2)} <span className="text-xs text-rose-500/70">{baseCurrency}</span></p>
                               </div>
                             </div>
                             <div className="bg-slate-100 p-1.5 rounded-full flex items-center justify-center text-slate-500">
@@ -1245,15 +1252,14 @@
                             </div>
                           </div>
 
-                          {/* Lista de Deudores (Expandido) */}
+                          {/* Lista a quién pagar (Expandido) */}
                           {isExpanded && (
                             <div className="bg-slate-50 border-t border-slate-100 p-4 space-y-3">
                               {data.debts.map((tf, i) => (
                                 <div key={i} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                   <div className="flex items-center space-x-2">
-                                    <div className="font-bold text-slate-700 text-sm">{tf.from}</div>
-                                    <Icon name="ArrowRight" className="w-4 h-4 text-slate-400" />
-                                    <div className="font-medium text-slate-500 text-sm">{tf.to}</div>
+                                    <span className="text-slate-400 text-sm">{t.toPerson}</span>
+                                    <div className="font-bold text-slate-700 text-sm">{tf.to}</div>
                                   </div>
                                   <div className="flex items-center justify-between sm:justify-end sm:space-x-4 w-full sm:w-auto">
                                     <div className="font-bold text-slate-800">
@@ -1282,15 +1288,25 @@
                   <h3 className="font-bold text-slate-800 mb-3 flex items-center">
                     <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> {t.netContributed}
                   </h3>
-                  <div className="space-y-2">
-                    {Object.entries(totalContributedPerPerson).sort((a,b) => b[1] - a[1]).map(([person, amount]) => (
-                      <div key={person} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg">
-                        <span className="font-medium text-slate-700 text-sm">{person}</span>
-                        <span className="font-bold text-slate-800">{currencySymbol}{amount.toFixed(2)}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {Object.entries(totalContributedPerPerson).sort((a,b) => b[1] - a[1]).map(([person, amount]) => {
+                      const bal = balances[person] || 0;
+                      return (
+                        <div key={person} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-700 text-sm">{person}</span>
+                            <div className="flex items-center mt-1 space-x-2 text-[11px] font-bold">
+                              {bal > 0.01 && <span className="text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">{t.isOwedAmount} {currencySymbol}{bal.toFixed(2)}</span>}
+                              {bal < -0.01 && <span className="text-rose-600 bg-rose-100/60 px-1.5 py-0.5 rounded">{t.owesAmount} {currencySymbol}{Math.abs(bal).toFixed(2)}</span>}
+                              {Math.abs(bal) <= 0.01 && <span className="text-slate-500 bg-slate-200/50 px-1.5 py-0.5 rounded">{t.upToDate}</span>}
+                            </div>
+                          </div>
+                          <span className="font-black text-slate-800 text-lg">{currencySymbol}{amount.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-slate-400 mt-3 text-center">{t.netContributedDesc}</p>
+                  <p className="text-xs text-slate-400 mt-4 text-center">{t.netContributedDesc}</p>
                 </div>
 
                 {/* Gastos por Categoría */}
