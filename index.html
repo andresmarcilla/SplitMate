@@ -5,24 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SplitMate - Gastos Compartidos</title>
   
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
-  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-slate-100">
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    // --- Importaciones de Firebase ---
+    // --- Importaciones de Firebase (NUEVAS FUNCIONES AÑADIDAS: writeBatch, query, where, getDocs) ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion, arrayRemove, writeBatch, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
     const { useState, useEffect, useMemo } = React;
 
@@ -532,21 +529,44 @@
             participants: arrayUnion(profileName)
           });
         } else {
+          // Escritura por lotes segura
+          const batch = writeBatch(db);
+          
+          const tripRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id);
           const newParticipants = [...new Set(tripToJoin.participants.map(p => p === selectedIdentity ? profileName : p))];
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
-            participants: newParticipants
+          batch.update(tripRef, { participants: newParticipants });
+
+          const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), where('tripId', '==', tripToJoin.id));
+          const querySnapshot = await getDocs(q);
+
+          querySnapshot.forEach((expDoc) => {
+            const exp = expDoc.data();
+            let needsUpdate = false;
+            const updates = {};
+            
+            if (exp.paidBy === selectedIdentity) {
+              updates.paidBy = profileName;
+              needsUpdate = true;
+            }
+            if (exp.splitAmong && exp.splitAmong.includes(selectedIdentity)) {
+              updates.splitAmong = [...new Set(exp.splitAmong.map(p => p === selectedIdentity ? profileName : p))];
+              needsUpdate = true;
+            }
+
+            if (exp.isSettlement && exp.description) {
+               const regex = new RegExp(`\\b${selectedIdentity}\\b`, 'g');
+               if (regex.test(exp.description)) {
+                 updates.description = exp.description.replace(regex, profileName);
+                 needsUpdate = true;
+               }
+            }
+
+            if (needsUpdate) {
+              batch.update(expDoc.ref, updates);
+            }
           });
 
-          const relatedExpenses = expenses.filter(e => e.tripId === tripToJoin.id && (e.paidBy === selectedIdentity || e.splitAmong.includes(selectedIdentity)));
-          
-          for (const exp of relatedExpenses) {
-            const updates = {};
-            if (exp.paidBy === selectedIdentity) updates.paidBy = profileName;
-            if (exp.splitAmong.includes(selectedIdentity)) {
-              updates.splitAmong = [...new Set(exp.splitAmong.map(p => p === selectedIdentity ? profileName : p))];
-            }
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id), updates);
-          }
+          await batch.commit();
         }
         
         setShowMapIdentityModal(false);
