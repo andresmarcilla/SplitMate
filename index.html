@@ -16,7 +16,6 @@
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
-    // --- Importaciones de Firebase (NUEVAS FUNCIONES AÑADIDAS: writeBatch, query, where, getDocs) ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
     import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion, arrayRemove, writeBatch, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
@@ -37,7 +36,6 @@
 
     const appId = 'splitmate-prod'; 
 
-    // Inicializar Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -110,6 +108,8 @@
         saveExpense: "Guardar Gasto",
         deleteTrip: "Eliminar Plan",
         delete: "Eliminar",
+        resetTrip: "Reiniciar Plan",
+        resetTripConfirm: "¿Estás seguro de que quieres borrar TODOS los gastos de este plan? Esta acción no se puede deshacer y los balances volverán a cero.",
         joinTrip: "Unirse a un Plan",
         askForCode: "Pídele a quien creó el plan que te comparta el código.",
         join: "Unirse",
@@ -206,6 +206,8 @@
         saveExpense: "Save Expense",
         deleteTrip: "Delete Plan",
         delete: "Delete",
+        resetTrip: "Reset Plan",
+        resetTripConfirm: "Are you sure you want to delete ALL expenses for this plan? This action cannot be undone and balances will be reset to zero.",
         joinTrip: "Join a Plan",
         askForCode: "Ask the plan creator to share the code with you.",
         join: "Join",
@@ -274,7 +276,7 @@
       );
     };
 
-    // --- Constantes de Monedas Reorganizadas ---
+    // --- Constantes de Monedas ---
     const CURRENCIES = {
       EUR: { symbol: '€', name: 'Euro (EUR)' },
       USD: { symbol: '$', name: 'US Dollar (USD)' },
@@ -405,7 +407,6 @@
       const [expenseToEdit, setExpenseToEdit] = useState(null);
       const [confirmDialog, setConfirmDialog] = useState(null);
 
-      // --- Idioma ---
       const [lang, setLang] = useState(() => localStorage.getItem('splitmate_lang') || 'es');
       useEffect(() => { localStorage.setItem('splitmate_lang', lang); }, [lang]);
       const t = i18n[lang];
@@ -425,7 +426,6 @@
                   setProfileName(null);
                 }
               } catch (e) {
-                console.error("Error fetching profile", e);
                 setProfileName(null);
               }
             } else {
@@ -457,7 +457,7 @@
             return b.createdAt - a.createdAt;
           });
           setTrips(fetchedTrips);
-        }, (err) => console.error("Error fetching trips:", err));
+        });
 
         const unsubExpenses = onSnapshot(expensesRef, (snap) => {
           const fetchedExpenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -468,7 +468,7 @@
             return b.createdAt - a.createdAt;
           });
           setExpenses(fetchedExpenses);
-        }, (err) => console.error("Error fetching expenses:", err));
+        });
 
         return () => {
           unsubTrips();
@@ -518,7 +518,6 @@
             alert(`${t.errNoCode} "${cleanCode}".`);
           }
         } catch (error) {
-          console.error("Error al unirse al viaje:", error);
           alert(t.errConn);
         }
       };
@@ -529,7 +528,6 @@
             participants: arrayUnion(profileName)
           });
         } else {
-          // Escritura por lotes segura
           const batch = writeBatch(db);
           
           const tripRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id);
@@ -633,11 +631,23 @@
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId));
       };
 
+      const handleResetExpenses = async (tripId) => {
+        if (!user || !tripId) return;
+        const relatedExpenses = expenses.filter(e => e.tripId === tripId);
+        
+        // Usar escritura por lotes para un borrado eficiente y simultáneo
+        const batch = writeBatch(db);
+        relatedExpenses.forEach(exp => {
+          batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
+        });
+        await batch.commit();
+      };
+
       const handleLogout = () => {
         signOut(auth).catch(err => console.error("Error cerrando sesión:", err));
       };
 
-      // --- Renderizado ---
+      // --- Renderizado Condicional ---
       if (isAuthChecking) {
         return (
           <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -728,6 +738,13 @@
                       action: () => handleDeleteTrip(currentTrip.id)
                     });
                   }}
+                  onResetTrip={() => {
+                    setConfirmDialog({
+                      title: t.resetTrip,
+                      message: t.resetTripConfirm,
+                      action: () => handleResetExpenses(currentTrip.id)
+                    });
+                  }}
                   onRemoveParticipant={(participantName) => {
                     const isSelf = participantName === profileName;
                     setConfirmDialog({
@@ -748,6 +765,7 @@
               )}
             </main>
 
+            {/* Modales Compartidos */}
             {showNewTripModal && (
               <NewTripModal 
                 t={t}
@@ -798,6 +816,7 @@
               <NewExpenseModal 
                 trip={currentTrip}
                 expenseToEdit={expenseToEdit}
+                profileName={profileName}
                 t={t}
                 onClose={() => { setShowNewExpenseModal(false); setExpenseToEdit(null); }} 
                 onSubmit={handleSaveExpense} 
@@ -822,111 +841,7 @@
       );
     }
 
-    // --- Pantalla de Inicio de Sesión ---
-    function LoginScreen({ t, lang, setLang }) {
-      const [isLoading, setIsLoading] = useState(false);
-
-      const handleGoogleLogin = async () => {
-        setIsLoading(true);
-        const provider = new GoogleAuthProvider();
-        try {
-          const authObj = getAuth();
-          await signInWithPopup(authObj, provider);
-        } catch (error) {
-          console.error("Error logging in: ", error);
-          if (error.code === 'auth/unauthorized-domain') {
-            const errStr = lang === 'es' 
-              ? `¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`
-              : `ATTENTION! Unauthorized domain in Firebase.\n\nTo fix this:\n1. Go to Firebase Console.\n2. Go to Authentication -> Settings -> Authorized domains.\n3. Add this exact domain:\n\n${window.location.hostname}\n\nMeanwhile, you can continue as Guest.`;
-            alert(errStr);
-          } else {
-            alert(t.errGoogle);
-          }
-          setIsLoading(false);
-        }
-      };
-
-      const handleAnonymousLogin = async () => {
-        setIsLoading(true);
-        try {
-          const authObj = getAuth();
-          await signInAnonymously(authObj);
-        } catch (error) {
-          console.error("Error logging in as guest: ", error);
-          alert(t.errGuest);
-          setIsLoading(false);
-        }
-      };
-
-      return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
-          <div className="absolute top-4 right-4">
-            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
-              {lang === 'es' ? 'EN' : 'ES'}
-            </button>
-          </div>
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
-              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.welcome}</h1>
-            <p className="text-slate-500 mb-8 font-medium">{t.welcomeDesc}</p>
-            
-            <div className="space-y-4">
-              <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
-                {isLoading ? <span>{t.connecting}</span> : (
-                  <>
-                    <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    {t.loginGoogle}
-                  </>
-                )}
-              </button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">{t.or}</span></div>
-              </div>
-
-              <button onClick={handleAnonymousLogin} disabled={isLoading} className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
-                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> {t.guest}
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function WelcomeScreen({ onSave, t, lang, setLang }) {
-      const [name, setName] = useState('');
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (name.trim()) onSave(name.trim());
-      };
-      return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
-          <div className="absolute top-4 right-4">
-            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
-              {lang === 'es' ? 'EN' : 'ES'}
-            </button>
-          </div>
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.lastStep}</h1>
-            <p className="text-slate-500 mb-8 font-medium">{t.guestDesc}</p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.yourName} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
-              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">{t.saveAndEnter}</button>
-            </form>
-          </div>
-        </div>
-      );
-    }
-
-    // --- Sub-Componentes ---
+    // --- Componente Dashboard ---
     function Dashboard({ trips, onSelectTrip, onNewTrip, onJoinTrip, t, lang }) {
       return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -977,7 +892,8 @@
       );
     }
 
-    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onRemoveParticipant, onAddParticipant, onSettleDebt, t, lang }) {
+    // --- Componente Detalle del Viaje ---
+    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onResetTrip, onRemoveParticipant, onAddParticipant, onSettleDebt, t, lang }) {
       const [activeTab, setActiveTab] = useState('expenses');
       const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
       const [expandedDebtors, setExpandedDebtors] = useState({});
@@ -985,7 +901,6 @@
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
       const transfers = useMemo(() => simplifyDebts(balances), [balances]);
 
-      // --- Agrupar transferencias por Deudor (quién debe pagar) ---
       const groupedTransfers = useMemo(() => {
         const groups = {};
         transfers.forEach(tf => {
@@ -1065,10 +980,8 @@
       return (
         <div className="animate-in fade-in duration-300">
           
-          {/* Panel Superior Fijo (Sticky) */}
           <div className="sticky top-[60px] bg-slate-50/95 backdrop-blur-md z-20 px-4 pt-4 pb-3 shadow-sm border-b border-slate-200">
             
-            {/* Tarjeta de Resumen Colapsable */}
             <div 
               className="bg-slate-800 rounded-2xl p-4 text-white mb-4 shadow-lg shadow-slate-300 relative cursor-pointer hover:bg-slate-700 transition-colors"
               onClick={(e) => {
@@ -1095,9 +1008,14 @@
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-sm font-medium text-slate-300">{t.groupDetails}</p>
                     {isCreatorUser && (
-                      <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t.deleteTrip}>
-                        <Icon name="Trash2" className="w-5 h-5" />
-                      </button>
+                      <div className="flex space-x-2">
+                        <button onClick={onResetTrip} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t.resetTrip}>
+                          <Icon name="RefreshCw" className="w-5 h-5" />
+                        </button>
+                        <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t.deleteTrip}>
+                          <Icon name="Trash2" className="w-5 h-5" />
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -1136,7 +1054,7 @@
                     
                     {isCreatorUser && (
                       <button onClick={onAddParticipant} className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-500/30 shadow-sm ml-1">
-                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.add}
+                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.addAnotherPerson}
                       </button>
                     )}
                   </div>
@@ -1151,7 +1069,6 @@
               )}
             </div>
 
-            {/* Pestañas de Navegación */}
             <div className="flex bg-slate-200/80 p-1 rounded-xl mb-3 border border-slate-200">
               <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
                 <span className="hidden sm:inline mr-1">🧾</span> {t.expensesTab}
@@ -1164,14 +1081,12 @@
               </button>
             </div>
 
-            {/* Botón Añadir Gasto - Siempre Visible */}
             <button onClick={onAddExpense} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-200">
               <Icon name="Plus" className="w-5 h-5" />
               <span>{t.addExpense}</span>
             </button>
           </div>
 
-          {/* Contenedor Inferior de Listas que hace scroll */}
           <div className="px-4 pb-8 pt-2">
             {activeTab === 'expenses' && (
               <div className="space-y-3">
@@ -1251,7 +1166,6 @@
                       return (
                         <div key={debtor} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                           
-                          {/* Cabecera del Deudor (Colapsable) */}
                           <div 
                             className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
                             onClick={() => toggleDebtor(debtor)}
@@ -1272,7 +1186,6 @@
                             </div>
                           </div>
 
-                          {/* Lista a quién pagar (Expandido) */}
                           {isExpanded && (
                             <div className="bg-slate-50 border-t border-slate-100 p-4 space-y-3">
                               {data.debts.map((tf, i) => (
@@ -1303,7 +1216,6 @@
 
             {activeTab === 'summary' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {/* Gastado por Persona */}
                 <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                   <h3 className="font-bold text-slate-800 mb-3 flex items-center">
                     <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> {t.netContributed}
@@ -1329,7 +1241,6 @@
                   <p className="text-xs text-slate-400 mt-4 text-center">{t.netContributedDesc}</p>
                 </div>
 
-                {/* Gastos por Categoría */}
                 {Object.keys(categoryTotals).length > 0 && (
                   <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center">
@@ -1351,7 +1262,6 @@
                   </div>
                 )}
 
-                {/* Mayor Gasto */}
                 {biggestExpense && (
                   <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center">
@@ -1373,7 +1283,7 @@
       );
     }
 
-    // Modal para que el Creador añada personas libremente
+    // --- Componente AddParticipantModal ---
     function AddParticipantModal({ onClose, onSubmit, t }) {
       const [name, setName] = useState('');
       const handleSubmit = (e) => {
@@ -1401,7 +1311,7 @@
       );
     }
 
-    // Modal para Mapear la Identidad al Unirse
+    // --- Componente MapIdentityModal ---
     function MapIdentityModal({ trip, profileName, onClose, onConfirm, t }) {
       const [selectedIdentity, setSelectedIdentity] = useState('__NEW__');
       const handleSubmit = (e) => {
@@ -1442,6 +1352,7 @@
       );
     }
 
+    // --- Componente NewTripModal ---
     function NewTripModal({ onClose, onSubmit, t }) {
       const [name, setName] = useState('');
       const [baseCurrency, setBaseCurrency] = useState('EUR');
@@ -1552,7 +1463,8 @@
       );
     }
 
-    function NewExpenseModal({ trip, expenseToEdit, onClose, onSubmit, t }) {
+    // --- Componente NewExpenseModal ---
+    function NewExpenseModal({ trip, expenseToEdit, profileName, onClose, onSubmit, t }) {
       const tripCurrency = trip.baseCurrency || 'EUR';
       const [description, setDescription] = useState(expenseToEdit ? expenseToEdit.description : '');
       const [amount, setAmount] = useState(expenseToEdit ? expenseToEdit.amount.toString() : '');
@@ -1560,7 +1472,10 @@
       const [currency, setCurrency] = useState(expenseToEdit ? (expenseToEdit.currency || tripCurrency) : tripCurrency);
       const [exchangeRate, setExchangeRate] = useState(expenseToEdit ? (expenseToEdit.exchangeRate || 1) : 1);
       const [isFetchingRate, setIsFetchingRate] = useState(false);
-      const [paidBy, setPaidBy] = useState(expenseToEdit ? expenseToEdit.paidBy : trip.participants[0]);
+      
+      const defaultPaidBy = trip.participants.includes(profileName) ? profileName : trip.participants[0];
+      const [paidBy, setPaidBy] = useState(expenseToEdit ? expenseToEdit.paidBy : defaultPaidBy);
+      
       const [splitAmong, setSplitAmong] = useState(expenseToEdit ? expenseToEdit.splitAmong : [...trip.participants]);
       const [error, setError] = useState('');
 
@@ -1727,6 +1642,7 @@
       );
     }
 
+    // --- Componente ConfirmModal ---
     function ConfirmModal({ title, message, onCancel, onConfirm, t }) {
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200 p-4">
@@ -1745,6 +1661,7 @@
       );
     }
 
+    // --- Componente JoinTripModal ---
     function JoinTripModal({ onClose, onSubmit, t }) {
       const [code, setCode] = useState('');
 
@@ -1770,6 +1687,111 @@
                 <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
                 <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{t.join}</button>
               </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // --- Componente LoginScreen ---
+    function LoginScreen({ t, lang, setLang }) {
+      const [isLoading, setIsLoading] = useState(false);
+
+      const handleGoogleLogin = async () => {
+        setIsLoading(true);
+        const provider = new GoogleAuthProvider();
+        try {
+          const authObj = getAuth();
+          await signInWithPopup(authObj, provider);
+        } catch (error) {
+          console.error("Error logging in: ", error);
+          if (error.code === 'auth/unauthorized-domain') {
+            const errStr = lang === 'es' 
+              ? `¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`
+              : `ATTENTION! Unauthorized domain in Firebase.\n\nTo fix this:\n1. Go to Firebase Console.\n2. Go to Authentication -> Settings -> Authorized domains.\n3. Add this exact domain:\n\n${window.location.hostname}\n\nMeanwhile, you can continue as Guest.`;
+            alert(errStr);
+          } else {
+            alert(t.errGoogle);
+          }
+          setIsLoading(false);
+        }
+      };
+
+      const handleAnonymousLogin = async () => {
+        setIsLoading(true);
+        try {
+          const authObj = getAuth();
+          await signInAnonymously(authObj);
+        } catch (error) {
+          console.error("Error logging in as guest: ", error);
+          alert(t.errGuest);
+          setIsLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
+          <div className="absolute top-4 right-4">
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
+              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.welcome}</h1>
+            <p className="text-slate-500 mb-8 font-medium">{t.welcomeDesc}</p>
+            
+            <div className="space-y-4">
+              <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+                {isLoading ? <span>{t.connecting}</span> : (
+                  <>
+                    <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    {t.loginGoogle}
+                  </>
+                )}
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
+                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">{t.or}</span></div>
+              </div>
+
+              <button onClick={handleAnonymousLogin} disabled={isLoading} className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> {t.guest}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- Componente WelcomeScreen ---
+    function WelcomeScreen({ onSave, t, lang, setLang }) {
+      const [name, setName] = useState('');
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim()) onSave(name.trim());
+      };
+      return (
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
+          <div className="absolute top-4 right-4">
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.lastStep}</h1>
+            <p className="text-slate-500 mb-8 font-medium">{t.guestDesc}</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.yourName} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
+              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">{t.saveAndEnter}</button>
             </form>
           </div>
         </div>
