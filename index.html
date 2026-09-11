@@ -138,7 +138,11 @@
         selectOnePerson: "Al menos una persona debe ser seleccionada para dividir.",
         paymentOf: "Pago de",
         toPerson: "A",
-        to: "a"
+        to: "a",
+        shareDebts: "Compartir Deudas",
+        debtsSummary: "Resumen de deudas",
+        paysToShare: "debe pagar a:",
+        checkDetails: "Revisa los detalles aquí:"
       },
       en: {
         loading: "Loading SplitMate...",
@@ -236,7 +240,11 @@
         selectOnePerson: "At least one person must be selected to split.",
         paymentOf: "Payment from",
         toPerson: "To",
-        to: "to"
+        to: "to",
+        shareDebts: "Share Debts",
+        debtsSummary: "Debts summary",
+        paysToShare: "pays to:",
+        checkDetails: "Check details here:"
       }
     };
 
@@ -977,6 +985,22 @@
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
       };
 
+      const shareDebtsWhatsApp = () => {
+        let text = `💸 *${t.debtsSummary} - ${trip.name}*\n\n`;
+
+        Object.entries(groupedTransfers).forEach(([debtor, data]) => {
+          text += `*${debtor}* ${t.paysToShare}\n`;
+          data.debts.forEach(tf => {
+            text += `- ${tf.to}: ${currencySymbol}${tf.amount.toFixed(2)} ${baseCurrency}\n`;
+          });
+          text += `\n`;
+        });
+
+        text += `🔗 ${t.checkDetails} ${window.location.href}`;
+
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+      };
+
       return (
         <div className="animate-in fade-in duration-300">
           
@@ -1144,11 +1168,18 @@
 
             {activeTab === 'balances' && (
               <div className="space-y-4">
-                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4">
-                  <h3 className="font-bold text-emerald-800 flex items-center">
-                    <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> {t.simplifiedDebts}
-                  </h3>
-                  <p className="text-sm text-emerald-600 mt-1">{t.debtsDesc}</p>
+                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-4 flex justify-between items-start">
+                  <div className="pr-2">
+                    <h3 className="font-bold text-emerald-800 flex items-center">
+                      <Icon name="BadgeDollarSign" className="w-5 h-5 mr-2" /> {t.simplifiedDebts}
+                    </h3>
+                    <p className="text-sm text-emerald-600 mt-1">{t.debtsDesc}</p>
+                  </div>
+                  {transfers.length > 0 && (
+                    <button onClick={shareDebtsWhatsApp} className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors flex-shrink-0 shadow-sm mt-1" title={t.shareDebts}>
+                      <Icon name="Share2" className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 {Object.keys(groupedTransfers).length === 0 ? (
