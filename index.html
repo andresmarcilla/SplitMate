@@ -71,8 +71,11 @@
         groupDetails: "Detalles del Grupo",
         inviteCode: "Código de Invitación",
         add: "Añadir",
-        preferences: "Preferencias de Pago",
-        preferencesDesc: "Elige con quién prefieres liquidar deudas primero (ej. tu pareja o amigos cercanos).",
+        preferences: "Preferencias de Cobro",
+        preferencesFor: "Preferencias para",
+        preferencesDesc: "Elige quiénes deberían pagarle primero a esta persona en la liquidación de deudas (ej. su pareja o amigos cercanos).",
+        preferredPayers: "Pagan primero:",
+        configurePayers: "Elegir quién le paga primero",
         savePreferences: "Guardar Preferencias",
         expensesTab: "Gastos",
         debtsTab: "Deudas",
@@ -83,13 +86,14 @@
         splitWith: "Dividido con",
         everyone: "Todos",
         simplifiedDebts: "Deudas Simplificadas",
-        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias, priorizando primero tus vínculos cercanos.",
+        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias, priorizando las preferencias elegidas por el creador.",
         allSettled: "¡Todo saldado!",
         nobodyOwes: "Nadie debe nada en este momento.",
         needsToPay: "debe pagar",
         markPaid: "Marcar Pagado",
         netContributed: "Dinero aportado (Neto)",
         netContributedDesc: "Esto indica el dinero real que ha salido del bolsillo de cada persona, teniendo en cuenta las deudas saldadas.",
+        adminPrefHint: "Como creador del plan, toca el botón ⚙️ en quienes aportaron dinero para elegir quiénes les pagan primero.",
         isOwedAmount: "Le deben:",
         owesAmount: "Debe:",
         upToDate: "Al día",
@@ -176,8 +180,11 @@
         groupDetails: "Group Details",
         inviteCode: "Invite Code",
         add: "Add",
-        preferences: "Payment Preferences",
-        preferencesDesc: "Choose who you prefer to settle debts with first (e.g., partner or close friends).",
+        preferences: "Payout Preferences",
+        preferencesFor: "Preferences for",
+        preferencesDesc: "Choose who should pay this person first when settling debts (e.g., their partner or close friends).",
+        preferredPayers: "Pay first:",
+        configurePayers: "Choose who pays them first",
         savePreferences: "Save Preferences",
         expensesTab: "Expenses",
         debtsTab: "Debts",
@@ -188,13 +195,14 @@
         splitWith: "Split with",
         everyone: "Everyone",
         simplifiedDebts: "Simplified Debts",
-        debtsDesc: "We've calculated the minimum transfers needed, prioritizing your close connections first.",
+        debtsDesc: "We've calculated the minimum transfers needed, prioritizing the preferences set by the creator.",
         allSettled: "All settled!",
         nobodyOwes: "Nobody owes anything right now.",
         needsToPay: "needs to pay",
         markPaid: "Mark Paid",
         netContributed: "Net Contributed",
         netContributedDesc: "This indicates the actual money that has left each person's pocket, taking into account settled debts.",
+        adminPrefHint: "As the plan creator, tap the ⚙️ button on those who contributed money to choose who pays them back first.",
         isOwedAmount: "Is owed:",
         owesAmount: "Owes:",
         upToDate: "Settled",
@@ -362,17 +370,32 @@
         }
       };
 
-      // FASE 1: Liquidar deudas emparejando personas según sus preferencias mutuas o directas
+      // Ordenar inicialmente de mayor a menor
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      // FASE 1: Priorizar quién le paga a cada acreedor según las preferencias elegidas por el creador
+      for (let j = 0; j < creditors.length; j++) {
+        let cName = creditors[j].person;
+        let cPrefs = preferences[cName] || [];
+        
+        // Respetar el orden de los pagadores preferidos de este acreedor
+        for (let prefPerson of cPrefs) {
+          let dIndex = debtors.findIndex(d => d.person === prefPerson);
+          if (dIndex !== -1) {
+            executeTransfer(dIndex, j);
+          }
+        }
+      }
+
+      // FASE 1.5: Respaldo por si se configuró alguna preferencia desde el lado del deudor
       for (let i = 0; i < debtors.length; i++) {
-        for (let j = 0; j < creditors.length; j++) {
-          let dName = debtors[i].person;
-          let cName = creditors[j].person;
-          
-          let dPrefs = preferences[dName] || [];
-          let cPrefs = preferences[cName] || [];
-          
-          if (dPrefs.includes(cName) || cPrefs.includes(dName)) {
-             executeTransfer(i, j);
+        let dName = debtors[i].person;
+        let dPrefs = preferences[dName] || [];
+        for (let prefCreditor of dPrefs) {
+          let cIndex = creditors.findIndex(c => c.person === prefCreditor);
+          if (cIndex !== -1) {
+            executeTransfer(i, cIndex);
           }
         }
       }
@@ -437,7 +460,7 @@
       const [showMapIdentityModal, setShowMapIdentityModal] = useState(false);
       const [tripToMap, setTripToMap] = useState(null);
       const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
-      const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+      const [preferenceTargetPerson, setPreferenceTargetPerson] = useState(null);
       
       const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
       const [expenseToEdit, setExpenseToEdit] = useState(null);
@@ -779,7 +802,7 @@
                   onEditExpense={openEditExpense}
                   onDeleteExpense={handleDeleteExpense}
                   onAddParticipant={() => setShowAddParticipantModal(true)}
-                  onShowPreferences={() => setShowPreferencesModal(true)}
+                  onShowPreferences={(targetPerson) => setPreferenceTargetPerson(targetPerson)}
                   onDeleteTrip={() => {
                     setConfirmDialog({
                       title: t.deleteTrip,
@@ -861,19 +884,19 @@
               />
             )}
             
-            {showPreferencesModal && currentTrip && (
+            {preferenceTargetPerson && currentTrip && (
               <PreferencesModal
                 t={t}
                 trip={currentTrip}
-                profileName={profileName}
-                onClose={() => setShowPreferencesModal(false)}
+                targetPerson={preferenceTargetPerson}
+                onClose={() => setPreferenceTargetPerson(null)}
                 onSubmit={async (selectedPrefs) => {
                   const newPrefs = { ...(currentTrip.preferences || {}) };
-                  newPrefs[profileName] = selectedPrefs;
+                  newPrefs[preferenceTargetPerson] = selectedPrefs;
                   await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.id), {
                     preferences: newPrefs
                   });
-                  setShowPreferencesModal(false);
+                  setPreferenceTargetPerson(null);
                 }}
               />
             )}
@@ -1070,7 +1093,6 @@
       const [expandedDebtors, setExpandedDebtors] = useState({});
 
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
-      // AQUI pasamos las preferencias del grupo
       const transfers = useMemo(() => simplifyDebts(balances, trip.preferences), [balances, trip.preferences]);
 
       const groupedTransfers = useMemo(() => {
@@ -1198,9 +1220,6 @@
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-sm font-medium text-slate-300">{t.groupDetails}</p>
                     <div className="flex space-x-2">
-                      <button onClick={onShowPreferences} className="text-blue-400 hover:text-blue-300 transition-colors p-1 mr-2" title={t.preferences}>
-                        <Icon name="Settings" className="w-5 h-5" />
-                      </button>
                       {isCreatorUser && (
                         <>
                           <button onClick={onResetTrip} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t.resetTrip}>
@@ -1249,7 +1268,7 @@
                     
                     {isCreatorUser && (
                       <button onClick={onAddParticipant} className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-500/30 shadow-sm ml-1">
-                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.add}
+                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.addAnotherPerson}
                       </button>
                     )}
                   </div>
@@ -1425,23 +1444,62 @@
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {/* Gastado por Persona */}
                 <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
-                  <h3 className="font-bold text-slate-800 mb-3 flex items-center">
-                    <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> {t.netContributed}
-                  </h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold text-slate-800 flex items-center">
+                      <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> {t.netContributed}
+                    </h3>
+                  </div>
+
+                  {isCreatorUser && (
+                    <div className="bg-blue-50 border border-blue-100 text-blue-800 text-xs p-2.5 rounded-xl mb-3 flex items-start">
+                      <Icon name="Settings" className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <span>{t.adminPrefHint}</span>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {Object.entries(totalContributedPerPerson).sort((a,b) => b[1] - a[1]).map(([person, amount]) => {
                       const bal = balances[person] || 0;
+                      const personPrefs = (trip.preferences && trip.preferences[person]) || [];
+                      // El admin puede configurar preferencias para quienes hayan pagado algo o se les deba dinero
+                      const canHavePreferences = amount > 0.01 || bal > 0.01;
+
                       return (
-                        <div key={person} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-700 text-sm">{person}</span>
-                            <div className="flex items-center mt-1 space-x-2 text-[11px] font-bold">
-                              {bal > 0.01 && <span className="text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">{t.isOwedAmount} {currencySymbol}{bal.toFixed(2)}</span>}
-                              {bal < -0.01 && <span className="text-rose-600 bg-rose-100/60 px-1.5 py-0.5 rounded">{t.owesAmount} {currencySymbol}{Math.abs(bal).toFixed(2)}</span>}
-                              {Math.abs(bal) <= 0.01 && <span className="text-slate-500 bg-slate-200/50 px-1.5 py-0.5 rounded">{t.upToDate}</span>}
+                        <div key={person} className="flex flex-col bg-slate-50 p-3 rounded-lg border border-slate-100">
+                          <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-700 text-sm">{person}</span>
+                              <div className="flex items-center mt-1 space-x-2 text-[11px] font-bold">
+                                {bal > 0.01 && <span className="text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">{t.isOwedAmount} {currencySymbol}{bal.toFixed(2)}</span>}
+                                {bal < -0.01 && <span className="text-rose-600 bg-rose-100/60 px-1.5 py-0.5 rounded">{t.owesAmount} {currencySymbol}{Math.abs(bal).toFixed(2)}</span>}
+                                {Math.abs(bal) <= 0.01 && <span className="text-slate-500 bg-slate-200/50 px-1.5 py-0.5 rounded">{t.upToDate}</span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-black text-slate-800 text-lg">{currencySymbol}{amount.toFixed(2)}</span>
+                              {isCreatorUser && canHavePreferences && (
+                                <button
+                                  onClick={() => onShowPreferences(person)}
+                                  className={`p-1.5 rounded-lg border transition-colors ${personPrefs.length > 0 ? 'bg-blue-100 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200'}`}
+                                  title={t.configurePayers}
+                                >
+                                  <Icon name="Settings" className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
-                          <span className="font-black text-slate-800 text-lg">{currencySymbol}{amount.toFixed(2)}</span>
+
+                          {/* Mostrar las preferencias actuales si existen */}
+                          {personPrefs.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200/70 flex flex-wrap items-center gap-1 text-[11px]">
+                              <span className="text-slate-400 font-semibold mr-1">{t.preferredPayers}</span>
+                              {personPrefs.map(pref => (
+                                <span key={pref} className="bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded font-medium">
+                                  {pref}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1493,9 +1551,9 @@
       );
     }
 
-    // --- Componente PreferencesModal ---
-    function PreferencesModal({ trip, profileName, onClose, onSubmit, t }) {
-      const currentPrefs = (trip.preferences && trip.preferences[profileName]) || [];
+    // --- Componente PreferencesModal (Configurado por el Creador para cada Acreedor) ---
+    function PreferencesModal({ trip, targetPerson, onClose, onSubmit, t }) {
+      const currentPrefs = (trip.preferences && trip.preferences[targetPerson]) || [];
       const [selected, setSelected] = useState([...currentPrefs]);
 
       const togglePerson = (p) => {
@@ -1506,16 +1564,26 @@
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">{t.preferences}</h2>
+            <h2 className="text-xl font-bold text-slate-800 mb-1">
+              {t.preferencesFor} <span className="text-blue-600">{targetPerson}</span>
+            </h2>
             <p className="text-slate-500 mb-6 text-sm font-medium">{t.preferencesDesc}</p>
             
             <div className="grid grid-cols-2 gap-2 mb-6">
-              {trip.participants.filter(p => p !== profileName).map(p => {
+              {trip.participants.filter(p => p !== targetPerson).map(p => {
                 const isSelected = selected.includes(p);
+                const orderIndex = selected.indexOf(p);
                 return (
-                  <div key={p} onClick={() => togglePerson(p)} className={`flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-                    {isSelected ? <Icon name="CheckSquare" className="w-5 h-5 text-emerald-500" /> : <Icon name="Square" className="w-5 h-5 text-slate-300" />}
-                    <span className={`font-medium text-sm ${isSelected ? 'text-emerald-800' : 'text-slate-600'}`}>{p}</span>
+                  <div key={p} onClick={() => togglePerson(p)} className={`flex items-center justify-between p-3 border-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+                    <div className="flex items-center space-x-2 truncate">
+                      {isSelected ? <Icon name="CheckSquare" className="w-5 h-5 text-blue-500 flex-shrink-0" /> : <Icon name="Square" className="w-5 h-5 text-slate-300 flex-shrink-0" />}
+                      <span className={`font-medium text-sm truncate ${isSelected ? 'text-blue-900 font-bold' : 'text-slate-600'}`}>{p}</span>
+                    </div>
+                    {isSelected && (
+                      <span className="bg-blue-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ml-1">
+                        {orderIndex + 1}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -1718,7 +1786,6 @@
       const [exchangeRate, setExchangeRate] = useState(expenseToEdit ? (expenseToEdit.exchangeRate || 1) : 1);
       const [isFetchingRate, setIsFetchingRate] = useState(false);
       
-      // Default to the current logged-in user if they are part of the trip
       const defaultPaidBy = trip.participants.includes(profileName) ? profileName : trip.participants[0];
       const [paidBy, setPaidBy] = useState(expenseToEdit ? expenseToEdit.paidBy : defaultPaidBy);
       
