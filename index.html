@@ -5,17 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SplitMate - Gastos Compartidos</title>
   
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
+  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   
+  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-slate-100">
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
+    // --- Importaciones de Firebase ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
     import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
     import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, arrayUnion, arrayRemove, writeBatch, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
@@ -36,6 +40,7 @@
 
     const appId = 'splitmate-prod'; 
 
+    // Inicializar Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -66,6 +71,9 @@
         groupDetails: "Detalles del Grupo",
         inviteCode: "Código de Invitación",
         add: "Añadir",
+        preferences: "Preferencias de Pago",
+        preferencesDesc: "Elige con quién prefieres liquidar deudas primero (ej. tu pareja o amigos cercanos).",
+        savePreferences: "Guardar Preferencias",
         expensesTab: "Gastos",
         debtsTab: "Deudas",
         infoTab: "Info",
@@ -75,7 +83,7 @@
         splitWith: "Dividido con",
         everyone: "Todos",
         simplifiedDebts: "Deudas Simplificadas",
-        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias para liquidar todas las deudas, agrupadas por quién debe pagar.",
+        debtsDesc: "Hemos calculado el mínimo de transferencias necesarias, priorizando primero tus vínculos cercanos.",
         allSettled: "¡Todo saldado!",
         nobodyOwes: "Nadie debe nada en este momento.",
         needsToPay: "debe pagar",
@@ -114,20 +122,20 @@
         askForCode: "Pídele a quien creó el plan que te comparta el código.",
         join: "Unirse",
         whoAreYou: "¿Quién eres en este plan?",
-        whoAreYouDesc: "Es posible que el organizador ya haya empezado a añadir tus gastos. Si estás en la lista, selecciona tu nombre para reclamar tus gastos, de lo contrario, únete como uno nuevo.",
+        whoAreYouDesc: "Es posible que el organizador ya haya empezado a añadir tus gastos. Si estás en la lista, selecciona tu nombre para reclamar tus gastos.",
         addNewAs: "Añadirme como nuevo:",
         alreadyInGroupAs: "Ya estoy en el grupo como:",
         confirmIdentity: "Confirmar Identidad",
         participantName: "Nombre del participante",
         logout: "Cerrar sesión",
         connecting: "Conectando...",
-        errGoogle: "Error de conexión con Google. Tu antivirus o bloqueador de anuncios podría estar interfiriendo.\n\nPor favor, usa la opción 'Continuar como Invitado' abajo.",
+        errGoogle: "Error de conexión con Google. Usa la opción 'Continuar como Invitado'.",
         errGuest: "Error al entrar como invitado.",
         errNoCode: "No encontramos ningún plan con el código",
         errConn: "Hubo un error de conexión al intentar unirte. Inténtalo de nuevo.",
         codeCopied: "¡Código copiado al portapapeles!",
         codeNotCopied: "No se pudo copiar el código. Por favor cópialo manualmente:",
-        deleteTripConfirm: "¿Estás seguro de que quieres eliminar el plan? Esto también borrará todos los gastos asociados. Esta acción no se puede deshacer.",
+        deleteTripConfirm: "¿Estás seguro de que quieres eliminar el plan? Esto también borrará todos los gastos asociados.",
         leaveTripConfirm: "¿Estás seguro de que quieres salir de este plan?",
         removeParticipantConfirm: "¿Estás seguro de que quieres eliminar a este participante del plan?",
         alreadyInTrip: "Esta persona ya está en el plan.",
@@ -168,6 +176,9 @@
         groupDetails: "Group Details",
         inviteCode: "Invite Code",
         add: "Add",
+        preferences: "Payment Preferences",
+        preferencesDesc: "Choose who you prefer to settle debts with first (e.g., partner or close friends).",
+        savePreferences: "Save Preferences",
         expensesTab: "Expenses",
         debtsTab: "Debts",
         infoTab: "Info",
@@ -177,7 +188,7 @@
         splitWith: "Split with",
         everyone: "Everyone",
         simplifiedDebts: "Simplified Debts",
-        debtsDesc: "We've calculated the minimum number of transfers needed to settle all debts, grouped by who needs to pay.",
+        debtsDesc: "We've calculated the minimum transfers needed, prioritizing your close connections first.",
         allSettled: "All settled!",
         nobodyOwes: "Nobody owes anything right now.",
         needsToPay: "needs to pay",
@@ -216,20 +227,20 @@
         askForCode: "Ask the plan creator to share the code with you.",
         join: "Join",
         whoAreYou: "Who are you in this plan?",
-        whoAreYouDesc: "The organizer may have already started adding your expenses. If you're on the list, select your name to claim your expenses, otherwise join as a new person.",
+        whoAreYouDesc: "The organizer may have already started adding your expenses. If you're on the list, select your name.",
         addNewAs: "Add me as new:",
         alreadyInGroupAs: "I'm already in the group as:",
         confirmIdentity: "Confirm Identity",
         participantName: "Participant name",
         logout: "Logout",
         connecting: "Connecting...",
-        errGoogle: "Connection error with Google. Your antivirus or adblocker might be interfering.\n\nPlease use the 'Continue as Guest' option below.",
+        errGoogle: "Connection error with Google. Please use the 'Continue as Guest' option below.",
         errGuest: "Error entering as guest.",
         errNoCode: "We didn't find any plan with the code",
         errConn: "There was a connection error when trying to join.",
         codeCopied: "Code copied to clipboard!",
         codeNotCopied: "Could not copy the code. Please copy it manually:",
-        deleteTripConfirm: "Are you sure you want to delete the plan? This will also delete all associated expenses. This action cannot be undone.",
+        deleteTripConfirm: "Are you sure you want to delete the plan? This will also delete all associated expenses.",
         leaveTripConfirm: "Are you sure you want to leave this plan?",
         removeParticipantConfirm: "Are you sure you want to remove this participant from the plan?",
         alreadyInTrip: "This person is already in the plan.",
@@ -275,7 +286,8 @@
         UserCircle: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></>,
         PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
         TrendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
-        Share2: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></>
+        Share2: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></>,
+        Settings: <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>
       };
       return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -284,7 +296,6 @@
       );
     };
 
-    // --- Constantes de Monedas ---
     const CURRENCIES = {
       EUR: { symbol: '€', name: 'Euro (EUR)' },
       USD: { symbol: '$', name: 'US Dollar (USD)' },
@@ -298,7 +309,7 @@
       JPY: { symbol: '¥', name: 'Yen Japonés (JPY)' },
     };
 
-    // --- Algoritmo de Simplificación de Deudas ---
+    // --- Algoritmo con FASE de Preferencias de Pago ---
     function calculateBalances(tripExpenses, participants) {
       let balances = {};
       participants.forEach(p => balances[p] = 0);
@@ -325,7 +336,7 @@
       return balances;
     }
 
-    function simplifyDebts(balances) {
+    function simplifyDebts(balances, preferences = {}) {
       let debtors = [];
       let creditors = [];
 
@@ -334,33 +345,49 @@
         if (amount > 0.01) creditors.push({ person, amount });
       }
 
-      debtors.sort((a, b) => b.amount - a.amount);
-      creditors.sort((a, b) => b.amount - a.amount);
-
       let transfers = [];
-      let i = 0; 
-      let j = 0; 
 
-      while (i < debtors.length && j < creditors.length) {
-        let debtor = debtors[i];
-        let creditor = creditors[j];
+      const executeTransfer = (dIndex, cIndex) => {
+        let debtor = debtors[dIndex];
+        let creditor = creditors[cIndex];
+        if (debtor.amount < 0.01 || creditor.amount < 0.01) return;
 
         let minAmount = Math.min(debtor.amount, creditor.amount);
         minAmount = Math.round(minAmount * 100) / 100;
 
         if (minAmount > 0) {
-          transfers.push({
-            from: debtor.person,
-            to: creditor.person,
-            amount: minAmount
-          });
+          transfers.push({ from: debtor.person, to: creditor.person, amount: minAmount });
+          debtor.amount -= minAmount;
+          creditor.amount -= minAmount;
         }
+      };
 
-        debtor.amount -= minAmount;
-        creditor.amount -= minAmount;
+      // FASE 1: Liquidar deudas emparejando personas según sus preferencias mutuas o directas
+      for (let i = 0; i < debtors.length; i++) {
+        for (let j = 0; j < creditors.length; j++) {
+          let dName = debtors[i].person;
+          let cName = creditors[j].person;
+          
+          let dPrefs = preferences[dName] || [];
+          let cPrefs = preferences[cName] || [];
+          
+          if (dPrefs.includes(cName) || cPrefs.includes(dName)) {
+             executeTransfer(i, j);
+          }
+        }
+      }
 
-        if (debtor.amount < 0.01) i++;
-        if (creditor.amount < 0.01) j++;
+      // Re-ordenar remanentes para emparejamiento ávido estándar
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      // FASE 2: Emparejamiento estándar con el resto
+      let i = 0; 
+      let j = 0; 
+      while (i < debtors.length && j < creditors.length) {
+        executeTransfer(i, j);
+        if (debtors[i].amount < 0.01) i++;
+        if (creditors[j].amount < 0.01) j++;
       }
 
       return transfers;
@@ -410,6 +437,7 @@
       const [showMapIdentityModal, setShowMapIdentityModal] = useState(false);
       const [tripToMap, setTripToMap] = useState(null);
       const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
+      const [showPreferencesModal, setShowPreferencesModal] = useState(false);
       
       const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
       const [expenseToEdit, setExpenseToEdit] = useState(null);
@@ -500,6 +528,7 @@
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trips'), {
           ...tripData,
           participants: finalParticipants,
+          preferences: {},
           inviteCode,
           createdAt: Date.now(),
           createdBy: user.uid
@@ -537,10 +566,22 @@
           });
         } else {
           const batch = writeBatch(db);
-          
           const tripRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id);
+          
           const newParticipants = [...new Set(tripToJoin.participants.map(p => p === selectedIdentity ? profileName : p))];
-          batch.update(tripRef, { participants: newParticipants });
+          
+          let newPrefs = { ...(tripToJoin.preferences || {}) };
+          if (newPrefs[selectedIdentity]) {
+            newPrefs[profileName] = newPrefs[selectedIdentity];
+            delete newPrefs[selectedIdentity];
+          }
+          for (let key in newPrefs) {
+            if (newPrefs[key].includes(selectedIdentity)) {
+              newPrefs[key] = [...new Set(newPrefs[key].map(p => p === selectedIdentity ? profileName : p))];
+            }
+          }
+
+          batch.update(tripRef, { participants: newParticipants, preferences: newPrefs });
 
           const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), where('tripId', '==', tripToJoin.id));
           const querySnapshot = await getDocs(q);
@@ -643,7 +684,6 @@
         if (!user || !tripId) return;
         const relatedExpenses = expenses.filter(e => e.tripId === tripId);
         
-        // Usar escritura por lotes para un borrado eficiente y simultáneo
         const batch = writeBatch(db);
         relatedExpenses.forEach(exp => {
           batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id));
@@ -739,6 +779,7 @@
                   onEditExpense={openEditExpense}
                   onDeleteExpense={handleDeleteExpense}
                   onAddParticipant={() => setShowAddParticipantModal(true)}
+                  onShowPreferences={() => setShowPreferencesModal(true)}
                   onDeleteTrip={() => {
                     setConfirmDialog({
                       title: t.deleteTrip,
@@ -819,6 +860,23 @@
                 }}
               />
             )}
+            
+            {showPreferencesModal && currentTrip && (
+              <PreferencesModal
+                t={t}
+                trip={currentTrip}
+                profileName={profileName}
+                onClose={() => setShowPreferencesModal(false)}
+                onSubmit={async (selectedPrefs) => {
+                  const newPrefs = { ...(currentTrip.preferences || {}) };
+                  newPrefs[profileName] = selectedPrefs;
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', currentTrip.id), {
+                    preferences: newPrefs
+                  });
+                  setShowPreferencesModal(false);
+                }}
+              />
+            )}
 
             {showNewExpenseModal && currentTrip && (
               <NewExpenseModal 
@@ -844,6 +902,111 @@
               />
             )}
 
+          </div>
+        </div>
+      );
+    }
+
+    // --- Pantalla de Inicio de Sesión ---
+    function LoginScreen({ t, lang, setLang }) {
+      const [isLoading, setIsLoading] = useState(false);
+
+      const handleGoogleLogin = async () => {
+        setIsLoading(true);
+        const provider = new GoogleAuthProvider();
+        try {
+          const authObj = getAuth();
+          await signInWithPopup(authObj, provider);
+        } catch (error) {
+          console.error("Error logging in: ", error);
+          if (error.code === 'auth/unauthorized-domain') {
+            const errStr = lang === 'es' 
+              ? `¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`
+              : `ATTENTION! Unauthorized domain in Firebase.\n\nTo fix this:\n1. Go to Firebase Console.\n2. Go to Authentication -> Settings -> Authorized domains.\n3. Add this exact domain:\n\n${window.location.hostname}\n\nMeanwhile, you can continue as Guest.`;
+            alert(errStr);
+          } else {
+            alert(t.errGoogle);
+          }
+          setIsLoading(false);
+        }
+      };
+
+      const handleAnonymousLogin = async () => {
+        setIsLoading(true);
+        try {
+          const authObj = getAuth();
+          await signInAnonymously(authObj);
+        } catch (error) {
+          console.error("Error logging in as guest: ", error);
+          alert(t.errGuest);
+          setIsLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
+          <div className="absolute top-4 right-4">
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
+              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.welcome}</h1>
+            <p className="text-slate-500 mb-8 font-medium">{t.welcomeDesc}</p>
+            
+            <div className="space-y-4">
+              <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+                {isLoading ? <span>{t.connecting}</span> : (
+                  <>
+                    <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    {t.loginGoogle}
+                  </>
+                )}
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
+                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">{t.or}</span></div>
+              </div>
+
+              <button onClick={handleAnonymousLogin} disabled={isLoading} className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> {t.guest}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- Pantalla de Bienvenida para Invitados ---
+    function WelcomeScreen({ onSave, t, lang, setLang }) {
+      const [name, setName] = useState('');
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim()) onSave(name.trim());
+      };
+      return (
+        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
+          <div className="absolute top-4 right-4">
+            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
+              {lang === 'es' ? 'EN' : 'ES'}
+            </button>
+          </div>
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.lastStep}</h1>
+            <p className="text-slate-500 mb-8 font-medium">{t.guestDesc}</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.yourName} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
+              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">{t.saveAndEnter}</button>
+            </form>
           </div>
         </div>
       );
@@ -901,13 +1064,14 @@
     }
 
     // --- Componente Detalle del Viaje ---
-    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onResetTrip, onRemoveParticipant, onAddParticipant, onSettleDebt, t, lang }) {
+    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onResetTrip, onRemoveParticipant, onAddParticipant, onShowPreferences, onSettleDebt, t, lang }) {
       const [activeTab, setActiveTab] = useState('expenses');
       const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
       const [expandedDebtors, setExpandedDebtors] = useState({});
 
       const balances = useMemo(() => calculateBalances(expenses, trip.participants), [expenses, trip.participants]);
-      const transfers = useMemo(() => simplifyDebts(balances), [balances]);
+      // AQUI pasamos las preferencias del grupo
+      const transfers = useMemo(() => simplifyDebts(balances, trip.preferences), [balances, trip.preferences]);
 
       const groupedTransfers = useMemo(() => {
         const groups = {};
@@ -1004,8 +1168,10 @@
       return (
         <div className="animate-in fade-in duration-300">
           
+          {/* Panel Superior Fijo (Sticky) */}
           <div className="sticky top-[60px] bg-slate-50/95 backdrop-blur-md z-20 px-4 pt-4 pb-3 shadow-sm border-b border-slate-200">
             
+            {/* Tarjeta de Resumen Colapsable */}
             <div 
               className="bg-slate-800 rounded-2xl p-4 text-white mb-4 shadow-lg shadow-slate-300 relative cursor-pointer hover:bg-slate-700 transition-colors"
               onClick={(e) => {
@@ -1031,16 +1197,21 @@
                   
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-sm font-medium text-slate-300">{t.groupDetails}</p>
-                    {isCreatorUser && (
-                      <div className="flex space-x-2">
-                        <button onClick={onResetTrip} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t.resetTrip}>
-                          <Icon name="RefreshCw" className="w-5 h-5" />
-                        </button>
-                        <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t.deleteTrip}>
-                          <Icon name="Trash2" className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex space-x-2">
+                      <button onClick={onShowPreferences} className="text-blue-400 hover:text-blue-300 transition-colors p-1 mr-2" title={t.preferences}>
+                        <Icon name="Settings" className="w-5 h-5" />
+                      </button>
+                      {isCreatorUser && (
+                        <>
+                          <button onClick={onResetTrip} className="text-amber-400 hover:text-amber-300 transition-colors p-1" title={t.resetTrip}>
+                            <Icon name="RefreshCw" className="w-5 h-5" />
+                          </button>
+                          <button onClick={onDeleteTrip} className="text-red-400 hover:text-red-300 transition-colors p-1" title={t.deleteTrip}>
+                            <Icon name="Trash2" className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {trip.inviteCode && (
@@ -1078,7 +1249,7 @@
                     
                     {isCreatorUser && (
                       <button onClick={onAddParticipant} className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-500/30 shadow-sm ml-1">
-                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.addAnotherPerson}
+                        <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.add}
                       </button>
                     )}
                   </div>
@@ -1093,6 +1264,7 @@
               )}
             </div>
 
+            {/* Pestañas de Navegación */}
             <div className="flex bg-slate-200/80 p-1 rounded-xl mb-3 border border-slate-200">
               <button onClick={() => setActiveTab('expenses')} className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center ${activeTab === 'expenses' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
                 <span className="hidden sm:inline mr-1">🧾</span> {t.expensesTab}
@@ -1105,12 +1277,14 @@
               </button>
             </div>
 
+            {/* Botón Añadir Gasto - Siempre Visible */}
             <button onClick={onAddExpense} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-200">
               <Icon name="Plus" className="w-5 h-5" />
               <span>{t.addExpense}</span>
             </button>
           </div>
 
+          {/* Contenedor Inferior de Listas que hace scroll */}
           <div className="px-4 pb-8 pt-2">
             {activeTab === 'expenses' && (
               <div className="space-y-3">
@@ -1197,6 +1371,7 @@
                       return (
                         <div key={debtor} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                           
+                          {/* Cabecera del Deudor (Colapsable) */}
                           <div 
                             className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
                             onClick={() => toggleDebtor(debtor)}
@@ -1217,6 +1392,7 @@
                             </div>
                           </div>
 
+                          {/* Lista a quién pagar (Expandido) */}
                           {isExpanded && (
                             <div className="bg-slate-50 border-t border-slate-100 p-4 space-y-3">
                               {data.debts.map((tf, i) => (
@@ -1247,6 +1423,7 @@
 
             {activeTab === 'summary' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Gastado por Persona */}
                 <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                   <h3 className="font-bold text-slate-800 mb-3 flex items-center">
                     <Icon name="Users" className="w-4 h-4 mr-2 text-blue-500" /> {t.netContributed}
@@ -1272,6 +1449,7 @@
                   <p className="text-xs text-slate-400 mt-4 text-center">{t.netContributedDesc}</p>
                 </div>
 
+                {/* Gastos por Categoría */}
                 {Object.keys(categoryTotals).length > 0 && (
                   <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center">
@@ -1293,6 +1471,7 @@
                   </div>
                 )}
 
+                {/* Mayor Gasto */}
                 {biggestExpense && (
                   <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center">
@@ -1309,6 +1488,43 @@
                 )}
               </div>
             )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- Componente PreferencesModal ---
+    function PreferencesModal({ trip, profileName, onClose, onSubmit, t }) {
+      const currentPrefs = (trip.preferences && trip.preferences[profileName]) || [];
+      const [selected, setSelected] = useState([...currentPrefs]);
+
+      const togglePerson = (p) => {
+        if (selected.includes(p)) setSelected(selected.filter(x => x !== p));
+        else setSelected([...selected, p]);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">{t.preferences}</h2>
+            <p className="text-slate-500 mb-6 text-sm font-medium">{t.preferencesDesc}</p>
+            
+            <div className="grid grid-cols-2 gap-2 mb-6">
+              {trip.participants.filter(p => p !== profileName).map(p => {
+                const isSelected = selected.includes(p);
+                return (
+                  <div key={p} onClick={() => togglePerson(p)} className={`flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+                    {isSelected ? <Icon name="CheckSquare" className="w-5 h-5 text-emerald-500" /> : <Icon name="Square" className="w-5 h-5 text-slate-300" />}
+                    <span className={`font-medium text-sm ${isSelected ? 'text-emerald-800' : 'text-slate-600'}`}>{p}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 flex space-x-3">
+              <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
+              <button onClick={() => onSubmit(selected)} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">{t.savePreferences}</button>
+            </div>
           </div>
         </div>
       );
@@ -1383,7 +1599,6 @@
       );
     }
 
-    // --- Componente NewTripModal ---
     function NewTripModal({ onClose, onSubmit, t }) {
       const [name, setName] = useState('');
       const [baseCurrency, setBaseCurrency] = useState('EUR');
@@ -1494,7 +1709,6 @@
       );
     }
 
-    // --- Componente NewExpenseModal ---
     function NewExpenseModal({ trip, expenseToEdit, profileName, onClose, onSubmit, t }) {
       const tripCurrency = trip.baseCurrency || 'EUR';
       const [description, setDescription] = useState(expenseToEdit ? expenseToEdit.description : '');
@@ -1504,6 +1718,7 @@
       const [exchangeRate, setExchangeRate] = useState(expenseToEdit ? (expenseToEdit.exchangeRate || 1) : 1);
       const [isFetchingRate, setIsFetchingRate] = useState(false);
       
+      // Default to the current logged-in user if they are part of the trip
       const defaultPaidBy = trip.participants.includes(profileName) ? profileName : trip.participants[0];
       const [paidBy, setPaidBy] = useState(expenseToEdit ? expenseToEdit.paidBy : defaultPaidBy);
       
@@ -1673,7 +1888,6 @@
       );
     }
 
-    // --- Componente ConfirmModal ---
     function ConfirmModal({ title, message, onCancel, onConfirm, t }) {
       return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200 p-4">
@@ -1692,7 +1906,6 @@
       );
     }
 
-    // --- Componente JoinTripModal ---
     function JoinTripModal({ onClose, onSubmit, t }) {
       const [code, setCode] = useState('');
 
@@ -1718,111 +1931,6 @@
                 <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">{t.cancel}</button>
                 <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{t.join}</button>
               </div>
-            </form>
-          </div>
-        </div>
-      );
-    }
-
-    // --- Componente LoginScreen ---
-    function LoginScreen({ t, lang, setLang }) {
-      const [isLoading, setIsLoading] = useState(false);
-
-      const handleGoogleLogin = async () => {
-        setIsLoading(true);
-        const provider = new GoogleAuthProvider();
-        try {
-          const authObj = getAuth();
-          await signInWithPopup(authObj, provider);
-        } catch (error) {
-          console.error("Error logging in: ", error);
-          if (error.code === 'auth/unauthorized-domain') {
-            const errStr = lang === 'es' 
-              ? `¡ATENCIÓN! Dominio no autorizado en Firebase.\n\nPara solucionar esto:\n1. Ve a la Consola de Firebase.\n2. Entra en Authentication -> Configuración (Settings) -> Dominios autorizados.\n3. Añade este dominio exacto:\n\n${window.location.hostname}\n\nMientras tanto, puedes entrar como Invitado.`
-              : `ATTENTION! Unauthorized domain in Firebase.\n\nTo fix this:\n1. Go to Firebase Console.\n2. Go to Authentication -> Settings -> Authorized domains.\n3. Add this exact domain:\n\n${window.location.hostname}\n\nMeanwhile, you can continue as Guest.`;
-            alert(errStr);
-          } else {
-            alert(t.errGoogle);
-          }
-          setIsLoading(false);
-        }
-      };
-
-      const handleAnonymousLogin = async () => {
-        setIsLoading(true);
-        try {
-          const authObj = getAuth();
-          await signInAnonymously(authObj);
-        } catch (error) {
-          console.error("Error logging in as guest: ", error);
-          alert(t.errGuest);
-          setIsLoading(false);
-        }
-      };
-
-      return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
-          <div className="absolute top-4 right-4">
-            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
-              {lang === 'es' ? 'EN' : 'ES'}
-            </button>
-          </div>
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-12">
-              <Icon name="Plane" className="w-8 h-8 text-emerald-600 -rotate-12" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.welcome}</h1>
-            <p className="text-slate-500 mb-8 font-medium">{t.welcomeDesc}</p>
-            
-            <div className="space-y-4">
-              <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full py-4 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
-                {isLoading ? <span>{t.connecting}</span> : (
-                  <>
-                    <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    {t.loginGoogle}
-                  </>
-                )}
-              </button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-slate-500">{t.or}</span></div>
-              </div>
-
-              <button onClick={handleAnonymousLogin} disabled={isLoading} className="w-full py-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl flex items-center justify-center hover:bg-emerald-200 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
-                <Icon name="UserCircle" className="w-5 h-5 mr-2" /> {t.guest}
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // --- Componente WelcomeScreen ---
-    function WelcomeScreen({ onSave, t, lang, setLang }) {
-      const [name, setName] = useState('');
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (name.trim()) onSave(name.trim());
-      };
-      return (
-        <div className="min-h-screen bg-emerald-600 flex items-center justify-center p-4 font-sans relative">
-          <div className="absolute top-4 right-4">
-            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="bg-emerald-700/30 hover:bg-emerald-700/50 text-white px-3 py-1 rounded-full text-sm font-bold transition-colors">
-              {lang === 'es' ? 'EN' : 'ES'}
-            </button>
-          </div>
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl text-center animate-in zoom-in-95 duration-500">
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.lastStep}</h1>
-            <p className="text-slate-500 mb-8 font-medium">{t.guestDesc}</p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.yourName} className="w-full border-2 border-slate-200 rounded-xl px-4 py-4 focus:border-emerald-500 focus:outline-none transition-colors font-bold text-slate-800 text-lg text-center" autoFocus />
-              <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200">{t.saveAndEnter}</button>
             </form>
           </div>
         </div>
