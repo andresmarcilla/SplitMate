@@ -77,6 +77,7 @@
         preferredPayers: "Pagan primero:",
         configurePayers: "Elegir quién le paga primero",
         savePreferences: "Guardar Preferencias",
+        claimIdentityBtn: "Me llamaban de otra forma",
         expensesTab: "Gastos",
         debtsTab: "Deudas",
         infoTab: "Info",
@@ -186,6 +187,7 @@
         preferredPayers: "Pay first:",
         configurePayers: "Choose who pays them first",
         savePreferences: "Save Preferences",
+        claimIdentityBtn: "I had a placeholder name",
         expensesTab: "Expenses",
         debtsTab: "Debts",
         infoTab: "Info",
@@ -583,65 +585,86 @@
       };
 
       const handleConfirmIdentityMapping = async (tripToJoin, selectedIdentity) => {
-        if (selectedIdentity === '__NEW__') {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
-            participants: arrayUnion(profileName)
-          });
-        } else {
-          const batch = writeBatch(db);
-          const tripRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id);
-          
-          const newParticipants = [...new Set(tripToJoin.participants.map(p => p === selectedIdentity ? profileName : p))];
-          
-          let newPrefs = { ...(tripToJoin.preferences || {}) };
-          if (newPrefs[selectedIdentity]) {
-            newPrefs[profileName] = newPrefs[selectedIdentity];
-            delete newPrefs[selectedIdentity];
-          }
-          for (let key in newPrefs) {
-            if (newPrefs[key].includes(selectedIdentity)) {
-              newPrefs[key] = [...new Set(newPrefs[key].map(p => p === selectedIdentity ? profileName : p))];
-            }
-          }
+        try {
+          const cleanProfile = profileName.trim();
+          if (selectedIdentity === '__NEW__') {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id), {
+              participants: arrayUnion(cleanProfile)
+            });
+          } else {
+            const cleanTarget = selectedIdentity.trim();
+            const isSameName = (name) => typeof name === 'string' && name.trim().toLowerCase() === cleanTarget.toLowerCase();
 
-          batch.update(tripRef, { participants: newParticipants, preferences: newPrefs });
-
-          const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), where('tripId', '==', tripToJoin.id));
-          const querySnapshot = await getDocs(q);
-
-          querySnapshot.forEach((expDoc) => {
-            const exp = expDoc.data();
-            let needsUpdate = false;
-            const updates = {};
+            const batch = writeBatch(db);
+            const tripRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToJoin.id);
             
-            if (exp.paidBy === selectedIdentity) {
-              updates.paidBy = profileName;
-              needsUpdate = true;
+            // Actualizar lista de participantes asegurando que el nuevo nombre reemplace al placeholder
+            const updatedParticipants = tripToJoin.participants.map(p => isSameName(p) ? cleanProfile : p);
+            if (!updatedParticipants.includes(cleanProfile)) {
+              updatedParticipants.push(cleanProfile);
             }
-            if (exp.splitAmong && exp.splitAmong.includes(selectedIdentity)) {
-              updates.splitAmong = [...new Set(exp.splitAmong.map(p => p === selectedIdentity ? profileName : p))];
-              needsUpdate = true;
+            const newParticipants = [...new Set(updatedParticipants)];
+            
+            // Actualizar preferencias de pago si existían para ese nombre
+            let newPrefs = { ...(tripToJoin.preferences || {}) };
+            for (let key of Object.keys(newPrefs)) {
+              if (isSameName(key)) {
+                const existingForNew = newPrefs[cleanProfile] || [];
+                newPrefs[cleanProfile] = [...new Set([...existingForNew, ...newPrefs[key]])].filter(p => p !== cleanProfile);
+                if (key !== cleanProfile) delete newPrefs[key];
+              }
+            }
+            for (let key of Object.keys(newPrefs)) {
+              if (Array.isArray(newPrefs[key])) {
+                newPrefs[key] = [...new Set(newPrefs[key].map(p => isSameName(p) ? cleanProfile : p))].filter(p => p !== key);
+              }
             }
 
-            if (exp.isSettlement && exp.description) {
-               const regex = new RegExp(`\\b${selectedIdentity}\\b`, 'g');
-               if (regex.test(exp.description)) {
-                 updates.description = exp.description.replace(regex, profileName);
-                 needsUpdate = true;
-               }
-            }
+            batch.update(tripRef, { participants: newParticipants, preferences: newPrefs });
 
-            if (needsUpdate) {
-              batch.update(expDoc.ref, updates);
-            }
-          });
+            // Obtener todos los gastos de la base de datos y filtrar en memoria (evita errores de índices en Firebase)
+            const allExpensesSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'));
 
-          await batch.commit();
+            allExpensesSnap.forEach((expDoc) => {
+              const exp = expDoc.data();
+              if (exp.tripId !== tripToJoin.id) return;
+
+              let needsUpdate = false;
+              const updates = {};
+              
+              if (isSameName(exp.paidBy)) {
+                updates.paidBy = cleanProfile;
+                needsUpdate = true;
+              }
+              if (Array.isArray(exp.splitAmong) && exp.splitAmong.some(isSameName)) {
+                updates.splitAmong = [...new Set(exp.splitAmong.map(p => isSameName(p) ? cleanProfile : p))];
+                needsUpdate = true;
+              }
+
+              if (exp.isSettlement && exp.description) {
+                 const escapedIdentity = cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                 const regex = new RegExp(escapedIdentity, 'gi');
+                 if (regex.test(exp.description)) {
+                   updates.description = exp.description.replace(regex, cleanProfile);
+                   needsUpdate = true;
+                 }
+              }
+
+              if (needsUpdate) {
+                batch.update(expDoc.ref, updates);
+              }
+            });
+
+            await batch.commit();
+          }
+          
+          setShowMapIdentityModal(false);
+          setTripToMap(null);
+          setCurrentTripId(tripToJoin.id);
+        } catch (err) {
+          console.error("Error mapping identity:", err);
+          alert(t.errConn);
         }
-        
-        setShowMapIdentityModal(false);
-        setTripToMap(null);
-        setCurrentTripId(tripToJoin.id);
       };
 
       const handleSaveExpense = async (expenseData) => {
@@ -802,6 +825,10 @@
                   onEditExpense={openEditExpense}
                   onDeleteExpense={handleDeleteExpense}
                   onAddParticipant={() => setShowAddParticipantModal(true)}
+                  onClaimIdentity={() => {
+                    setTripToMap(currentTrip);
+                    setShowMapIdentityModal(true);
+                  }}
                   onShowPreferences={(targetPerson) => setPreferenceTargetPerson(targetPerson)}
                   onDeleteTrip={() => {
                     setConfirmDialog({
@@ -1087,7 +1114,7 @@
     }
 
     // --- Componente Detalle del Viaje ---
-    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onResetTrip, onRemoveParticipant, onAddParticipant, onShowPreferences, onSettleDebt, t, lang }) {
+    function TripDetail({ trip, expenses, user, profileName, onAddExpense, onEditExpense, onDeleteExpense, onDeleteTrip, onResetTrip, onRemoveParticipant, onAddParticipant, onClaimIdentity, onShowPreferences, onSettleDebt, t, lang }) {
       const [activeTab, setActiveTab] = useState('expenses');
       const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
       const [expandedDebtors, setExpandedDebtors] = useState({});
@@ -1269,6 +1296,11 @@
                     {isCreatorUser && (
                       <button onClick={onAddParticipant} className="bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-emerald-500/30 shadow-sm ml-1">
                         <Icon name="Plus" className="w-3 h-3 mr-1" /> {t.addAnotherPerson}
+                      </button>
+                    )}
+                    {trip.participants.length > 1 && (
+                      <button onClick={onClaimIdentity} className="bg-blue-500/20 text-blue-200 hover:bg-blue-500/40 transition-colors text-xs pl-2 pr-3 py-1 rounded-full font-medium flex items-center border border-blue-500/30 shadow-sm ml-1" title={t.whoAreYouDesc}>
+                        <Icon name="UserCircle" className="w-3 h-3 mr-1" /> {t.claimIdentityBtn}
                       </button>
                     )}
                   </div>
@@ -1628,7 +1660,8 @@
 
     // --- Componente MapIdentityModal ---
     function MapIdentityModal({ trip, profileName, onClose, onConfirm, t }) {
-      const [selectedIdentity, setSelectedIdentity] = useState('__NEW__');
+      const otherParticipants = trip.participants.filter(p => p.trim().toLowerCase() !== profileName.trim().toLowerCase());
+      const [selectedIdentity, setSelectedIdentity] = useState(otherParticipants[0] || '__NEW__');
       const handleSubmit = (e) => {
         e.preventDefault();
         onConfirm(trip, selectedIdentity);
@@ -1640,14 +1673,16 @@
             <p className="text-slate-500 mb-6 text-sm font-medium">{t.whoAreYouDesc}</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-3">
-                <label className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === '__NEW__' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                  <input type="radio" name="identity" value="__NEW__" checked={selectedIdentity === '__NEW__'} onChange={() => setSelectedIdentity('__NEW__')} className="hidden" />
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === '__NEW__' ? 'border-emerald-500' : 'border-slate-300'}`}>
-                    {selectedIdentity === '__NEW__' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>}
-                  </div>
-                  <span className="font-medium text-slate-800">{t.addNewAs}<br/><span className="font-bold text-emerald-700 text-lg">{profileName}</span></span>
-                </label>
-                {trip.participants.map(p => (
+                {!trip.participants.includes(profileName) && (
+                  <label className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === '__NEW__' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="identity" value="__NEW__" checked={selectedIdentity === '__NEW__'} onChange={() => setSelectedIdentity('__NEW__')} className="hidden" />
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === '__NEW__' ? 'border-emerald-500' : 'border-slate-300'}`}>
+                      {selectedIdentity === '__NEW__' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>}
+                    </div>
+                    <span className="font-medium text-slate-800">{t.addNewAs}<br/><span className="font-bold text-emerald-700 text-lg">{profileName}</span></span>
+                  </label>
+                )}
+                {otherParticipants.map(p => (
                   <label key={p} className={`flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedIdentity === p ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="identity" value={p} checked={selectedIdentity === p} onChange={() => setSelectedIdentity(p)} className="hidden" />
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedIdentity === p ? 'border-emerald-500' : 'border-slate-300'}`}>
